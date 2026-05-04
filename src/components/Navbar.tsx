@@ -9,7 +9,7 @@ export function Navbar() {
 
   const navItems = [
     { name: "Home", href: "/", icon: Home },
-    { name: "Devices", href: "/devices", icon: MonitorSmartphone },
+    { name: "Devices", href: "/device", icon: MonitorSmartphone },
     { name: "History", href: "/history", icon: Clock },
     { name: "Profile", href: "/profile", icon: User },
   ];
@@ -40,14 +40,14 @@ export function Navbar() {
                   href={item.href}
                   className={`
                     relative px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 group overflow-hidden
-                    ${isActive 
-                      ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10" 
+                    ${isActive
+                      ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-500/10"
                       : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-gray-800/50"
                     }
                   `}
                 >
-                  <item.icon 
-                    className={`w-4 h-4 transition-transform duration-300 group-hover:scale-110 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} 
+                  <item.icon
+                    className={`w-4 h-4 transition-transform duration-300 group-hover:scale-110 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`}
                   />
                   <span>{item.name}</span>
                   {isActive && (
