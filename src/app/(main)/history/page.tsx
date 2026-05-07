@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DeviceSnapshot {
     ip: string;
@@ -19,12 +20,13 @@ interface ScanRecord {
 }
 
 export default function HistoryPage() {
+    const { fetchWithAuth } = useAuth();
     const [scans, setScans] = useState<ScanRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/scan/history`)
+        fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/scan/history`)
             .then((res) => res.json())
             .then((data) => {
                 console.log("📜 Scan history:", data);
@@ -32,8 +34,10 @@ export default function HistoryPage() {
                 setIsLoading(false);
             })
             .catch((err) => {
-                console.error("พังซะแล้ว:", err);
-                setIsLoading(false);
+                if (err.message !== "Unauthorized") {
+                    console.error("พังซะแล้ว:", err);
+                    setIsLoading(false);
+                }
             });
     }, []);
 
