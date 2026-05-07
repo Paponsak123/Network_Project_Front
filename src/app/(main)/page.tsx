@@ -78,12 +78,6 @@ export default function Home() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold">📡 รายชื่ออุปกรณ์ใน Network</h1>
-          <button 
-            onClick={handleLogout}
-            className="text-sm px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors"
-          >
-            Logout
-          </button>
         </div>
         <button
           onClick={handleScan}
