@@ -1,4 +1,4 @@
-# Network Scanner
+# 🐸 Network Scanner 🐸
 
 A network scanning web application with a FastAPI backend and Next.js frontend.
 
