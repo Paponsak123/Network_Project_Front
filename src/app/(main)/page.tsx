@@ -124,7 +124,7 @@ export default function Home() {
           {Array.isArray(devices) && devices.map((device: any) => (
             <li key={device._id || Math.random()} className="p-4 border rounded-lg shadow-sm bg-white dark:bg-zinc-900 text-black dark:text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="font-medium text-lg mb-1">{device.customName || "Unknown Device"}</p>
+                <p className="font-medium text-lg mb-1">{device.customName || device.vendor || "Unknown Device"}</p>
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm text-gray-600 dark:text-gray-400">
                   <p><span className="font-semibold text-gray-700 dark:text-gray-300">IP:</span> {device.ip}</p>
                   <p><span className="font-semibold text-gray-700 dark:text-gray-300">MAC:</span> {device.mac}</p>
