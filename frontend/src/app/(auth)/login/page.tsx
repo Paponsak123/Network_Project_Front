@@ -23,9 +23,9 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true" 
+          "ngrok-skip-browser-warning": "true"
         },
         body: JSON.stringify({ username, password }),
       });
