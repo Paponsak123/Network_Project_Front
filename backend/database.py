@@ -3,6 +3,7 @@ MongoDB connection module.
 Replaces: dbconfig/mongo.js + mongoose connection in index.js
 """
 import os
+import certifi
 from pymongo import MongoClient
 
 client: MongoClient = None
@@ -13,7 +14,7 @@ def connect():
     """Connect to MongoDB and return the database instance."""
     global client, db
     mongo_uri = os.getenv("MONGO_URI")
-    client = MongoClient(mongo_uri)
+    client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
     # get_default_database() reads the DB name from the URI (e.g. 'network_scanner')
     db = client.get_default_database()
 
