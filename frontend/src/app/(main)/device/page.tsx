@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchDevices } from "@/api/devices";
 
 interface DeviceRecord {
     ip: string;
@@ -18,17 +19,9 @@ export default function DevicePage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`)
-            .then((res) => res.json())
+        fetchDevices(fetchWithAuth)
             .then((data) => {
-                console.log("👀 ข้อมูลจาก Backend:", data);
-                if (data.devices && Array.isArray(data.devices)) {
-                    setDevices(data.devices);
-                } else if (Array.isArray(data)) {
-                    setDevices(data);
-                } else {
-                    setDevices([]);
-                }
+                setDevices(data);
                 setIsLoading(false);
             })
             .catch((err) => {

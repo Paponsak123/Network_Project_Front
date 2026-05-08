@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchScanHistory } from "@/api/scan";
 
 interface DeviceSnapshot {
     ip: string;
@@ -26,11 +27,9 @@ export default function HistoryPage() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/scan/history`)
-            .then((res) => res.json())
+        fetchScanHistory(fetchWithAuth)
             .then((data) => {
-                console.log("📜 Scan history:", data);
-                setScans(Array.isArray(data) ? data : []);
+                setScans(data);
                 setIsLoading(false);
             })
             .catch((err) => {

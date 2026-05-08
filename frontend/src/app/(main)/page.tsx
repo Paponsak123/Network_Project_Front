@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchDevices } from "@/api/devices";
+import { triggerScan } from "@/api/scan";
 import Card from "@/components/Card";
 
 export default function Home() {
@@ -12,20 +14,12 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   // ฟังก์ชันสำหรับดึงข้อมูลอุปกรณ์
-  const fetchDevices = () => {
+  const loadDevices = () => {
     setIsLoading(true);
     setError(null);
-    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/devices`)
-      .then((res) => res.json())
+    fetchDevices(fetchWithAuth)
       .then((data) => {
-        if (Array.isArray(data)) {
-          setDevices(data);
-        } else if (data && data.message) {
-          setError(data.message);
-          setDevices([]);
-        } else {
-          setDevices([]);
-        }
+        setDevices(data);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -38,23 +32,22 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchDevices();
+    loadDevices();
   }, []);
 
   // ฟังก์ชันสำหรับกดปุ่มสแกน
   const handleScan = () => {
     setIsScanning(true);
     setError(null);
-    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/scan`, {
-      method: "POST",
-    })
-      .then((res) => res.json())
+    triggerScan(fetchWithAuth)
       .then((data) => {
         console.log("Scan complete:", data);
         if (data && data.message && !data.success && data.message.includes("Access denied")) {
           setError(data.message);
         }
-        fetchDevices();
+        // แจ้ง Navbar ให้ refresh ชื่อ Wi-Fi
+        window.dispatchEvent(new Event("wifi-ssid-refresh"));
+        loadDevices();
       })
       .catch((err) => {
         if (err.message !== "Unauthorized") {

@@ -1,11 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MonitorSmartphone, Clock, User } from "lucide-react";
+import { Home, MonitorSmartphone, Clock, User, Wifi } from "lucide-react";
+import { fetchSSID } from "@/api/wifi";
 
 export function Navbar() {
   const pathname = usePathname();
+  const [ssid, setSsid] = useState<string>("Network");
+
+  const loadSSID = () => {
+    fetchSSID().then((name) => {
+      if (name) setSsid(name);
+    });
+  };
+
+  useEffect(() => {
+    loadSSID();
+    // อัปเดตชื่อ Wi-Fi เมื่อกดสแกนเสร็จ
+    window.addEventListener("wifi-ssid-refresh", loadSSID);
+    return () => window.removeEventListener("wifi-ssid-refresh", loadSSID);
+  }, []);
 
   const navItems = [
     { name: "Home", href: "/", icon: Home },
@@ -21,11 +37,11 @@ export function Navbar() {
           {/* Logo / Brand */}
           <div className="flex-shrink-0 flex items-center">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-105">
-                N
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-105">
+                <Wifi className="w-4 h-4" />
               </div>
               <span className="font-semibold text-lg bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
-                Network
+                {ssid}
               </span>
             </Link>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { updateProfile } from "@/api/auth";
 
 function getUsernameFromToken(): string {
     if (typeof window === "undefined") return "";
@@ -31,17 +32,8 @@ export default function ProfilePage() {
         if (!editValue.trim()) return;
         try {
             const token = localStorage.getItem("token");
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/profile`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                    "ngrok-skip-browser-warning": "true",
-                },
-                body: JSON.stringify({ username: editValue.trim() }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || "Update failed");
+            if (!token) return;
+            const data = await updateProfile(token, editValue.trim());
             // อัปเดต token ใหม่ใน localStorage
             localStorage.setItem("token", data.token);
             localStorage.removeItem("displayName");

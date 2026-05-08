@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from database import connect, close
-from routes import auth, scan, devices
+from routes import auth, scan, devices, wifi
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])
 app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
+app.include_router(wifi.router, prefix="/api/wifi", tags=["Wi-Fi"])
 
 
 @app.get("/")
