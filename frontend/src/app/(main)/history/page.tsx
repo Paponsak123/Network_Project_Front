@@ -72,7 +72,7 @@ export default function HistoryPage() {
                                 >
                                     <div>
                                         <p className="font-semibold text-slate-800">
-                                            🕐 {new Date(scan.scanTime).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
+                                           { new Date(scan.scanTime + "Z").toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
                                         </p>
                                         <p className="text-sm text-slate-500 mt-0.5">
                                             พบอุปกรณ์ทั้งหมด {scan.totalDevices} เครื่อง
