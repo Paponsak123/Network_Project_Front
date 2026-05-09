@@ -36,14 +36,14 @@ def discover_devices():
     """Use nmap -sn to actively discover all devices on the local network."""
     subnet = get_local_subnet()
     print(f"🔍 Scanning subnet: {subnet}")
-    output = exec_command(f"nmap -sn {subnet}", timeout=60)
+    output = exec_command(f"nmap -sn -n {subnet}", timeout=60)
 
     devices = []
     lines = output.split("\n")
     current_ip = None
 
     for line in lines:
-        ip_match = re.search(r"Nmap scan report for\s+\S*\s*\(?(\d+\.\d+\.\d+\.\d+)\)?", line)
+        ip_match = re.search(r"Nmap scan report for\s+.*?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", line)
         if ip_match:
             current_ip = ip_match.group(1)
             continue
@@ -61,7 +61,7 @@ def discover_devices():
 def scan_device(ip):
     """Run nmap on a single IP to discover open ports."""
     try:
-        output = exec_command(f"nmap -Pn --top-ports 1000 {ip}")
+        output = exec_command(f"nmap -Pn -n --top-ports 1000 --host-timeout 15s --max-retries 1 {ip}", timeout=45)
         lines = output.split("\n")
         status = "offline"
         ports = []
