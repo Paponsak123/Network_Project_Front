@@ -2,9 +2,8 @@
 Network scanning service.
 Replaces: services/networkService.js
 """
-import os
-import platform
 import re
+import socket
 import subprocess
 from datetime import datetime
 
@@ -21,41 +20,42 @@ def exec_command(command, timeout=30):
         return ""
 
 
-def parse_arp_output(output):
-    """Parse arp -a output to extract IP and MAC addresses."""
-    devices = []
-    lines = output.strip().split("\n")
-    plat = platform.system().lower()
-
-    # Mac/Linux regex
-    unix_regex = re.compile(r"\(([^)]+)\)\s+at\s+([0-9a-fA-F:]{17})")
-    # Windows regex
-    win_regex = re.compile(
-        r"^\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+"
-        r"([0-9a-fA-F]{2}-[0-9a-fA-F]{2}-[0-9a-fA-F]{2}-"
-        r"[0-9a-fA-F]{2}-[0-9a-fA-F]{2}-[0-9a-fA-F]{2})"
-    )
-
-    arp_regex = win_regex if plat == "windows" else unix_regex
-
-    for line in lines:
-        match = arp_regex.search(line)
-        if match:
-            ip = match.group(1)
-            if ip.endswith(".255"):
-                continue
-            mac = match.group(2).lower().replace("-", ":")
-            if mac == "ff:ff:ff:ff:ff:ff":
-                continue
-            devices.append({"ip": ip, "mac": mac})
-
-    return devices
+def get_local_subnet():
+    """Auto-detect the local IP and return the /24 subnet (e.g. 192.168.1.0/24)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+    finally:
+        s.close()
+    prefix = ".".join(local_ip.split(".")[:3])
+    return f"{prefix}.0/24"
 
 
 def discover_devices():
-    """Run arp -a to discover devices on the local network."""
-    output = exec_command("arp -a")
-    return parse_arp_output(output)
+    """Use nmap -sn to actively discover all devices on the local network."""
+    subnet = get_local_subnet()
+    print(f"🔍 Scanning subnet: {subnet}")
+    output = exec_command(f"nmap -sn {subnet}", timeout=60)
+
+    devices = []
+    lines = output.split("\n")
+    current_ip = None
+
+    for line in lines:
+        ip_match = re.search(r"Nmap scan report for\s+\S*\s*\(?(\d+\.\d+\.\d+\.\d+)\)?", line)
+        if ip_match:
+            current_ip = ip_match.group(1)
+            continue
+
+        mac_match = re.search(r"MAC Address:\s+([0-9A-Fa-f:]{17})", line)
+        if mac_match and current_ip:
+            mac = mac_match.group(1).lower()
+            if not current_ip.endswith(".255") and mac != "ff:ff:ff:ff:ff:ff":
+                devices.append({"ip": current_ip, "mac": mac})
+            current_ip = None
+
+    return devices
 
 
 def scan_device(ip):
