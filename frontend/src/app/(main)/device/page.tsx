@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchDevices } from "@/api/devices";
-import DeviceDetailModal  from "@/components/deviceDetail";
+import { getActiveKicks } from "@/api/kick";
+import DeviceDetailModal from "@/components/deviceDetail";
 
 interface DeviceRecord {
     ip: string;
@@ -19,10 +20,19 @@ export default function DevicePage() {
     const [devices, setDevices] = useState<DeviceRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedDevice, setSelectedDevice] = useState<DeviceRecord | null>(null);
+    const [kickedIPs, setKickedIPs] = useState<Set<string>>(new Set());
 
     useEffect(() => {
-        fetchDevices(fetchWithAuth)
-            .then((data) => { setDevices(data); setIsLoading(false); })
+        // Load devices and active kicks in parallel
+        Promise.all([
+            fetchDevices(fetchWithAuth),
+            getActiveKicks(fetchWithAuth).catch(() => []),
+        ])
+            .then(([deviceData, activeKicks]) => {
+                setDevices(deviceData);
+                setKickedIPs(new Set(activeKicks.map((k: { ip: string }) => k.ip)));
+                setIsLoading(false);
+            })
             .catch((err) => {
                 if (err.message !== "Unauthorized") {
                     console.error("พังซะแล้ว:", err);
@@ -31,8 +41,16 @@ export default function DevicePage() {
             });
     }, []);
 
-    const handleKick = (mac: string) => {
-        alert(`เตะ ${mac} ออกจากเน็ต (ยังไม่ได้เชื่อม API)`);
+    const handleKickChange = (ip: string, kicked: boolean) => {
+        setKickedIPs((prev) => {
+            const next = new Set(prev);
+            if (kicked) {
+                next.add(ip);
+            } else {
+                next.delete(ip);
+            }
+            return next;
+        });
     };
 
     if (isLoading) return (
@@ -66,9 +84,16 @@ export default function DevicePage() {
                                             <p className="text-sm font-mono text-slate-400">MAC: {record.mac}</p>
                                         </div>
                                     </div>
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase tracking-wider ${record.status === "online" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                                        {record.status || "UNKNOWN"}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {kickedIPs.has(record.ip) && (
+                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                                                KICKED
+                                            </span>
+                                        )}
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase tracking-wider ${record.status === "online" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                                            {record.status || "UNKNOWN"}
+                                        </span>
+                                    </div>
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">Discovered Ports</p>
@@ -94,7 +119,8 @@ export default function DevicePage() {
                 <DeviceDetailModal
                     device={selectedDevice}
                     onClose={() => setSelectedDevice(null)}
-                    onKick={handleKick}
+                    isKicked={kickedIPs.has(selectedDevice.ip)}
+                    onKickChange={handleKickChange}
                 />
             )}
         </div>

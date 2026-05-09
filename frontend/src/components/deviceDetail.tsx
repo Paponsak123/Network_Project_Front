@@ -1,3 +1,9 @@
+"use client";
+
+import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { kickDevice, stopKick } from "@/api/kick";
+
 interface DeviceRecord {
     ip: string;
     mac: string;
@@ -10,12 +16,38 @@ interface DeviceRecord {
 export default function DeviceDetailModal({
     device,
     onClose,
-    onKick,
+    isKicked: initialKicked = false,
+    onKickChange,
 }: {
     device: DeviceRecord;
     onClose: () => void;
-    onKick: (mac: string) => void;
+    isKicked?: boolean;
+    onKickChange?: (ip: string, kicked: boolean) => void;
 }) {
+    const { fetchWithAuth } = useAuth();
+    const [isKicked, setIsKicked] = useState(initialKicked);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleToggleKick = async () => {
+        setIsLoading(true);
+        try {
+            if (isKicked) {
+                await stopKick(fetchWithAuth, device.ip);
+                setIsKicked(false);
+                onKickChange?.(device.ip, false);
+            } else {
+                await kickDevice(fetchWithAuth, device.ip, device.mac);
+                setIsKicked(true);
+                onKickChange?.(device.ip, true);
+            }
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "เกิดข้อผิดพลาด";
+            alert(message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -73,10 +105,19 @@ export default function DeviceDetailModal({
 
                 <div className="p-6 pt-0">
                     <button
-                        onClick={() => onKick(device.mac)}
-                        className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors duration-150"
+                        onClick={handleToggleKick}
+                        disabled={isLoading}
+                        className={`w-full py-2.5 font-semibold rounded-xl transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isKicked
+                                ? "bg-green-500 hover:bg-green-600 text-white"
+                                : "bg-red-500 hover:bg-red-600 text-white"
+                        }`}
                     >
-                        🚫 เตะออกจากเน็ต
+                        {isLoading
+                            ? "⏳ กำลังดำเนินการ..."
+                            : isKicked
+                                ? "✅ ปล่อยกลับเข้าเน็ต"
+                                : "🚫 เตะออกจากเน็ต"}
                     </button>
                 </div>
             </div>
