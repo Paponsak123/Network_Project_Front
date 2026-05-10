@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchDevices } from "@/api/devices";
 import { getActiveKicks } from "@/api/kick";
 import DeviceDetailModal from "@/components/deviceDetail";
+import { MonitorSmartphone, ShieldAlert, Cpu, Laptop, Smartphone, Server, Loader2, Database } from "lucide-react";
 
 interface DeviceRecord {
     ip: string;
@@ -15,6 +16,14 @@ interface DeviceRecord {
     ports: number[];
 }
 
+const getDeviceIcon = (vendor: string = "") => {
+  const v = vendor.toLowerCase();
+  if (v.includes("apple") || v.includes("samsung") || v.includes("google")) return <Smartphone className="w-5 h-5" />;
+  if (v.includes("intel") || v.includes("dell") || v.includes("hp") || v.includes("lenovo")) return <Laptop className="w-5 h-5" />;
+  if (v.includes("tp-link") || v.includes("cisco") || v.includes("ubiquiti")) return <Server className="w-5 h-5" />;
+  return <Cpu className="w-5 h-5" />;
+};
+
 export default function DevicePage() {
     const { fetchWithAuth } = useAuth();
     const [devices, setDevices] = useState<DeviceRecord[]>([]);
@@ -23,7 +32,6 @@ export default function DevicePage() {
     const [kickedIPs, setKickedIPs] = useState<Set<string>>(new Set());
 
     useEffect(() => {
-        // Load devices and active kicks in parallel
         Promise.all([
             fetchDevices(fetchWithAuth),
             getActiveKicks(fetchWithAuth).catch(() => []),
@@ -35,7 +43,7 @@ export default function DevicePage() {
             })
             .catch((err) => {
                 if (err.message !== "Unauthorized") {
-                    console.error("พังซะแล้ว:", err);
+                    console.error("Load error:", err);
                     setIsLoading(false);
                 }
             });
@@ -44,73 +52,92 @@ export default function DevicePage() {
     const handleKickChange = (ip: string, kicked: boolean) => {
         setKickedIPs((prev) => {
             const next = new Set(prev);
-            if (kicked) {
-                next.add(ip);
-            } else {
-                next.delete(ip);
-            }
+            if (kicked) next.add(ip);
+            else next.delete(ip);
             return next;
         });
     };
 
-    if (isLoading) return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500">
-            <p>กำลังโหลดข้อมูลอุปกรณ์...</p>
-        </div>
-    );
-
     return (
-        <div className="min-h-screen bg-slate-50 p-8 font-sans">
-            <div className="max-w-3xl mx-auto">
-                <h1 className="text-2xl font-bold text-slate-800 mb-6">Devices</h1>
+        <div className="p-6 md:p-10">
+            <div className="max-w-5xl mx-auto space-y-12">
+                {/* Header */}
+                <div className="flex flex-col items-center space-y-3 animate-in fade-in slide-in-from-top-4 duration-1000">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
+                    <MonitorSmartphone className="w-3 h-3" />
+                    Infrastructure Explorer
+                  </div>
+                  <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter text-center">
+                    Devices<span className="text-indigo-600">.</span>
+                  </h1>
+                </div>
 
-                {devices.length === 0 ? (
-                    <div className="text-center text-slate-500 py-10">ยังไม่พบอุปกรณ์ใน Network</div>
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                        <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Loading Nodes...</p>
+                    </div>
+                ) : devices.length === 0 ? (
+                    <div className="py-24 text-center space-y-6 bg-white dark:bg-zinc-900/30 rounded-[3rem] border-2 border-dashed border-zinc-200 dark:border-zinc-800">
+                        <Database className="w-10 h-10 text-zinc-300 mx-auto" />
+                        <p className="text-zinc-900 dark:text-white font-black text-2xl tracking-tighter">No Devices Detected</p>
+                    </div>
                 ) : (
-                    <div className="flex flex-col gap-4">
-                        {devices.map((record, index) => (
-                            <div
-                                key={record.mac || index}
-                                onClick={() => setSelectedDevice(record)}
-                                className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-200 cursor-pointer"
-                            >
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-slate-900">
-                                            {record.vendor || record.deviceType || "Unknown Device"}
-                                        </h2>
-                                        <div className="flex gap-3 mt-1">
-                                            <p className="text-sm font-mono text-slate-600">IP: {record.ip}</p>
-                                            <p className="text-sm font-mono text-slate-400">MAC: {record.mac}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                        {devices.map((record, idx) => {
+                            const isOnline = record.status === "online";
+                            const isKicked = kickedIPs.has(record.ip);
+                            return (
+                                <div
+                                    key={record.mac || idx}
+                                    onClick={() => setSelectedDevice(record)}
+                                    className="group relative p-6 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 cursor-pointer animate-in fade-in slide-in-from-bottom-4"
+                                    style={{ animationDelay: `${idx * 50}ms` }}
+                                >
+                                    <div className={`absolute top-0 left-0 w-1 h-full ${isKicked ? "bg-orange-500" : isOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
+                                    
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isOnline ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                                                {getDeviceIcon(record.vendor)}
+                                            </div>
+                                            <div>
+                                                <h2 className="font-black text-zinc-900 dark:text-white tracking-tight">
+                                                    {record.vendor || "Generic Device"}
+                                                </h2>
+                                                <div className="flex gap-3 mt-1">
+                                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{record.ip}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {isKicked && (
+                                                <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 flex items-center gap-1">
+                                                    <ShieldAlert className="w-3 h-3" /> Kicked
+                                                </span>
+                                            )}
+                                            <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${isOnline ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400"}`}>
+                                                {record.status}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {kickedIPs.has(record.ip) && (
-                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                                                KICKED
-                                            </span>
-                                        )}
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase tracking-wider ${record.status === "online" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                                            {record.status || "UNKNOWN"}
-                                        </span>
+                                    
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap gap-2">
+                                            {record.ports?.length > 0 ? (
+                                                record.ports.map((port, i) => (
+                                                    <span key={i} className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 text-[10px] font-black rounded-xl border border-indigo-100 dark:border-indigo-900/50 uppercase tracking-widest">
+                                                        Port {port}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">No Active Ports</span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">Discovered Ports</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {record.ports?.length > 0 ? (
-                                            record.ports.map((port, i) => (
-                                                <span key={i} className="px-3 py-1 bg-indigo-50 text-indigo-700 text-sm font-mono rounded-md border border-indigo-100">
-                                                    Port {port}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <span className="text-sm text-slate-400 italic">No open ports found</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

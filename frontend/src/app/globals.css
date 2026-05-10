@@ -42,6 +42,35 @@ body {
   66% { transform: translateY(10px) translateX(-15px); }
 }
 
+@keyframes enter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.fade-in {
+  opacity: 0;
+}
+
+.zoom-in {
+  transform: scale(0.97);
+}
+
+.slide-in-from-top-4 {
+  transform: translateY(-16px);
+}
+
+.slide-in-from-bottom-8 {
+  transform: translateY(32px);
+}
+
+.slide-in-from-bottom-4 {
+  transform: translateY(16px);
+}
+
 /* Custom shadow utilities */
 .shadow-card {
   box-shadow:
@@ -54,3 +83,4 @@ body {
     0px 4px 12px rgba(9, 30, 66, 0.1),
     0px 16px 40px rgba(9, 30, 66, 0.08);
 }
+
