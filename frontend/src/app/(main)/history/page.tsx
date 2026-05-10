@@ -46,13 +46,13 @@ export default function HistoryPage() {
             <div className="max-w-4xl mx-auto space-y-12">
                 {/* Header */}
                 <div className="flex flex-col items-center space-y-3 animate-in fade-in slide-in-from-top-4 duration-1000">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
-                    <HistoryIcon className="w-3 h-3" />
-                    Temporal Intelligence
-                  </div>
-                  <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter text-center">
-                    History<span className="text-indigo-600">.</span>
-                  </h1>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
+                        <HistoryIcon className="w-3 h-3" />
+                        Temporal Intelligence
+                    </div>
+                    <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter text-center">
+                        History<span className="text-indigo-600">.</span>
+                    </h1>
                 </div>
 
                 {isLoading ? (
@@ -85,7 +85,7 @@ export default function HistoryPage() {
                                         </div>
                                         <div>
                                             <p className="font-black text-zinc-900 dark:text-white tracking-tight">
-                                               { new Date(scan.scanTime + "Z").toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
+                                                {new Date(scan.scanTime + "Z").toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
                                             </p>
                                             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">
                                                 Nodes Discovered: {scan.totalDevices}
@@ -99,10 +99,6 @@ export default function HistoryPage() {
 
                                 {expandedId === scan._id && (
                                     <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 p-6 space-y-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Search className="w-3 h-3 text-indigo-500" />
-                                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Snapshot Details</span>
-                                        </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {scan.devices.map((device, i) => (
                                                 <div key={i} className="p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col justify-between transition-all duration-300 hover:border-indigo-500/20">
