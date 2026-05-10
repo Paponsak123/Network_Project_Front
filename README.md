@@ -39,7 +39,7 @@ JWT_SECRET=your_jwt_secret_key
 ```bash
 cd backend
 source venv/bin/activate
-python app.py
+sudo python app.py
 ```
 
 The API will be available at `http://localhost:3000` with Swagger docs at `http://localhost:3000/api-docs`.

