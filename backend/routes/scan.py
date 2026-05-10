@@ -113,3 +113,24 @@ def get_scan_history(current_user: dict = Depends(get_current_user)):
         result.append(s)
 
     return result
+
+# ---------- GET /api/scan/latest ----------
+@router.get("/latest")
+def get_latest_scan(current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    user_id = current_user["id"]
+
+    latest_scan = db.scans.find_one(
+        {"scannedBy": ObjectId(user_id)},
+        sort=[("scanTime", -1)]
+    )
+
+    if not latest_scan:
+        return {"devices": [], "scanTime": None, "totalDevices": 0}
+
+    s = serialize_doc(latest_scan)
+    return {
+        "devices": s.get("devices", []),
+        "scanTime": s.get("scanTime"),
+        "totalDevices": s.get("totalDevices", 0)
+    }

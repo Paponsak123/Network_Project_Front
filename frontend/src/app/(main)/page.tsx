@@ -17,11 +17,12 @@ export default function Home() {
   const loadDevices = () => {
     setIsLoading(true);
     setError(null);
-    fetchDevices(fetchWithAuth)
+    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/scan/latest`)
+      .then((res) => res.json())
       .then((data) => {
-        setDevices(data);
-        setIsLoading(false);
-      })
+      setDevices(data.devices || []);
+      setIsLoading(false);
+    })
       .catch((err) => {
         if (err.message !== "Unauthorized") {
           console.error("พังซะแล้ว:", err);
@@ -38,6 +39,8 @@ export default function Home() {
   // ฟังก์ชันสำหรับกดปุ่มสแกน
   const handleScan = () => {
     setIsScanning(true);
+    setIsLoading(true);
+    setDevices([]); 
     setError(null);
     triggerScan(fetchWithAuth)
       .then((data) => {
@@ -45,6 +48,11 @@ export default function Home() {
         if (data && data.message && !data.success && data.message.includes("Access denied")) {
           setError(data.message);
         }
+
+         if (data && Array.isArray(data.devices)) {
+        setDevices(data.devices);
+      }
+
         // แจ้ง Navbar ให้ refresh ชื่อ Wi-Fi
         window.dispatchEvent(new Event("wifi-ssid-refresh"));
         loadDevices();
@@ -57,6 +65,7 @@ export default function Home() {
       })
       .finally(() => {
         setIsScanning(false);
+        setIsLoading(false);
       });
   };
 
