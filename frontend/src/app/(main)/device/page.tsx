@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchDevices } from "@/api/devices";
 import { getActiveKicks } from "@/api/kick";
 import DeviceDetailModal from "@/components/deviceDetail";
-import { MonitorSmartphone, ShieldAlert, Cpu, Laptop, Smartphone, Server, Loader2, Database } from "lucide-react";
+import { MonitorSmartphone, ShieldAlert, Cpu, Laptop, Smartphone, Server, Loader2, Database, History } from "lucide-react";
 
 interface DeviceRecord {
     ip: string;
@@ -17,27 +16,30 @@ interface DeviceRecord {
 }
 
 const getDeviceIcon = (vendor: string = "") => {
-  const v = vendor.toLowerCase();
-  if (v.includes("apple") || v.includes("samsung") || v.includes("google")) return <Smartphone className="w-5 h-5" />;
-  if (v.includes("intel") || v.includes("dell") || v.includes("hp") || v.includes("lenovo")) return <Laptop className="w-5 h-5" />;
-  if (v.includes("tp-link") || v.includes("cisco") || v.includes("ubiquiti")) return <Server className="w-5 h-5" />;
-  return <Cpu className="w-5 h-5" />;
+    const v = vendor.toLowerCase();
+    if (v.includes("apple") || v.includes("samsung") || v.includes("google")) return <Smartphone className="w-5 h-5" />;
+    if (v.includes("intel") || v.includes("dell") || v.includes("hp") || v.includes("lenovo")) return <Laptop className="w-5 h-5" />;
+    if (v.includes("tp-link") || v.includes("cisco") || v.includes("ubiquiti")) return <Server className="w-5 h-5" />;
+    return <Cpu className="w-5 h-5" />;
 };
 
 export default function DevicePage() {
     const { fetchWithAuth } = useAuth();
     const [devices, setDevices] = useState<DeviceRecord[]>([]);
+    const [scanTime, setScanTime] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedDevice, setSelectedDevice] = useState<DeviceRecord | null>(null);
     const [kickedIPs, setKickedIPs] = useState<Set<string>>(new Set());
 
-    useEffect(() => {
+    const loadLatestDevices = () => {
+        setIsLoading(true);
         Promise.all([
-            fetchDevices(fetchWithAuth),
+            fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/scan/latest`).then(res => res.json()),
             getActiveKicks(fetchWithAuth).catch(() => []),
         ])
-            .then(([deviceData, activeKicks]) => {
-                setDevices(deviceData);
+            .then(([latestScan, activeKicks]) => {
+                setDevices(latestScan.devices || []);
+                setScanTime(latestScan.scanTime);
                 setKickedIPs(new Set(activeKicks.map((k: { ip: string }) => k.ip)));
                 setIsLoading(false);
             })
@@ -47,6 +49,10 @@ export default function DevicePage() {
                     setIsLoading(false);
                 }
             });
+    };
+
+    useEffect(() => {
+        loadLatestDevices();
     }, []);
 
     const handleKickChange = (ip: string, kicked: boolean) => {
@@ -63,29 +69,36 @@ export default function DevicePage() {
             <div className="max-w-5xl mx-auto space-y-12">
                 {/* Header */}
                 <div className="flex flex-col items-center space-y-3 animate-in fade-in slide-in-from-top-4 duration-1000">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
-                    <MonitorSmartphone className="w-3 h-3" />
-                    Infrastructure Explorer
-                  </div>
-                  <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter text-center">
-                    Devices<span className="text-indigo-600">.</span>
-                  </h1>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
+                        <MonitorSmartphone className="w-3 h-3" />
+                        Latest Scan Results
+                    </div>
+                    <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter text-center">
+                        Devices<span className="text-indigo-600">.</span>
+                    </h1>
+                    {scanTime && (
+                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest flex items-center gap-2 bg-white/50 dark:bg-zinc-900/50 px-4 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800">
+                            <History className="w-3 h-3" />
+                            Last Scan: {new Date(scanTime).toLocaleString("th-TH")}
+                        </p>
+                    )}
                 </div>
 
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-20 space-y-4">
                         <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-                        <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Loading Nodes...</p>
+                        <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Accessing Latest Snapshot...</p>
                     </div>
                 ) : devices.length === 0 ? (
                     <div className="py-24 text-center space-y-6 bg-white dark:bg-zinc-900/30 rounded-[3rem] border-2 border-dashed border-zinc-200 dark:border-zinc-800">
                         <Database className="w-10 h-10 text-zinc-300 mx-auto" />
-                        <p className="text-zinc-900 dark:text-white font-black text-2xl tracking-tighter">No Devices Detected</p>
+                        <p className="text-zinc-900 dark:text-white font-black text-2xl tracking-tighter">No Recent Scan Data</p>
+                        <p className="text-sm text-zinc-400 max-w-xs mx-auto font-medium">Please perform a new scan from the Home dashboard.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                         {devices.map((record, idx) => {
-                            const isOnline = record.status === "online";
+                            const isOnline = record.status === "online" || record.status === "up";
                             const isKicked = kickedIPs.has(record.ip);
                             return (
                                 <div
@@ -95,7 +108,7 @@ export default function DevicePage() {
                                     style={{ animationDelay: `${idx * 50}ms` }}
                                 >
                                     <div className={`absolute top-0 left-0 w-1 h-full ${isKicked ? "bg-orange-500" : isOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
-                                    
+
                                     <div className="flex justify-between items-start mb-6">
                                         <div className="flex items-center gap-4">
                                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isOnline ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
@@ -121,7 +134,7 @@ export default function DevicePage() {
                                             </span>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-3">
                                         <div className="flex flex-wrap gap-2">
                                             {record.ports?.length > 0 ? (
