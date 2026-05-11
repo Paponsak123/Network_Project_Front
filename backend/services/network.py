@@ -65,6 +65,29 @@ def discover_devices():
     """Use both arp -a (cache) and nmap (active) to discover all devices."""
     devices_by_ip = {}
 
+    import platform
+
+    # ===== DEBUG: ดูจำนวน ARP entries ก่อน flush =====
+    arp_before = exec_command(["arp", "-a"])
+    before_count = len([line for line in arp_before.splitlines() if line.strip()])
+    print(f"[DEBUG] ARP entries before flush: {before_count}", flush=True)
+
+    # ===== Flush ARP / Neighbor cache =====
+    if platform.system() == "Darwin":  # macOS
+        exec_command(["sudo", "arp", "-da"])
+    else:  # Linux
+        exec_command(["sudo", "ip", "neigh", "flush", "all"])
+
+    # ===== DEBUG: ดูจำนวน ARP entries หลัง flush =====
+    arp_after = exec_command(["arp", "-a"])
+    after_count = len([line for line in arp_after.splitlines() if line.strip()])
+    print(f"[DEBUG] ARP entries after flush: {after_count}", flush=True)
+
+    if after_count < before_count:
+        print("[DEBUG] ARP cache flushed successfully.", flush=True)
+    else:
+        print("[DEBUG] Cache may have been immediately repopulated.", flush=True)
+
     # 1. ARP Cache
     arp_output = exec_command(["arp", "-a"])
     for line in arp_output.split("\n"):
@@ -204,3 +227,4 @@ def perform_full_scan():
         })
 
     return merged
+
