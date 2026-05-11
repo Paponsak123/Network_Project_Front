@@ -41,7 +41,7 @@ export default function BlockerPage() {
   const handleAddDomain = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlInput.trim()) return;
-    
+
     setIsAdding(true);
     setError(null);
     try {
@@ -69,7 +69,7 @@ export default function BlockerPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?")) return;
-    
+
     try {
       await deleteBlockedDomain(fetchWithAuth, id);
       setDomains(domains.filter(d => d._id !== id));
@@ -89,7 +89,7 @@ export default function BlockerPage() {
             System Control
           </div>
           <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter">
-            Web Filter<span className="text-indigo-600">.</span>
+            BlockDer<span className="text-indigo-600">.</span>
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-center max-w-sm mx-auto text-sm font-medium leading-relaxed">
             Block access to specific websites across your system by modifying local DNS rules.
@@ -174,7 +174,7 @@ export default function BlockerPage() {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3 self-end sm:self-auto">
                       {/* Toggle Switch */}
                       <button
@@ -183,7 +183,7 @@ export default function BlockerPage() {
                       >
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${domain.active ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
-                      
+
                       <button
                         onClick={() => handleDelete(domain._id)}
                         className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors"

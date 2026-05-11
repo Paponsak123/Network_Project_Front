@@ -74,7 +74,7 @@ export default function DevicePage() {
                         Latest Scan Results
                     </div>
                     <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter text-center">
-                        Devices<span className="text-indigo-600">.</span>
+                        DeviceDer<span className="text-indigo-600">.</span>
                     </h1>
                     {scanTime && (
                         <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest flex items-center gap-2 bg-white/50 dark:bg-zinc-900/50 px-4 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800">

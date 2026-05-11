@@ -44,7 +44,7 @@ export default function Home() {
     setScanStatus("scanning");
     setIsLoading(true);
     setError(null);
-    
+
     triggerScan(fetchWithAuth)
       .then((data) => {
         if (data && data.message && !data.success && data.message.includes("Access denied")) {
@@ -89,7 +89,7 @@ export default function Home() {
             Network Status: Live
           </div>
           <h1 className="text-4xl md:text-6xl font-black text-zinc-900 dark:text-white tracking-tighter">
-            Scanner<span className="text-indigo-600">.</span>
+            ScanDer<span className="text-indigo-600">.</span>
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-center max-w-sm mx-auto text-sm font-medium leading-relaxed">
             Real-time network intelligence for your connected environment.
@@ -98,12 +98,12 @@ export default function Home() {
 
         {/* ===== Circular Scanner (Centerpiece) ===== */}
         <div className="flex flex-col items-center justify-center space-y-8 py-4 animate-in fade-in zoom-in duration-1000 delay-200">
-          <CircularScanner 
-            isScanning={isScanning} 
-            onScan={handleScan} 
-            status={scanStatus} 
+          <CircularScanner
+            isScanning={isScanning}
+            onScan={handleScan}
+            status={scanStatus}
           />
-          
+
           {/* Status Indicator Bar */}
           <div className="flex items-center gap-10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md px-8 py-4 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm transition-all duration-500 hover:shadow-md">
             <div className="flex flex-col items-center">
@@ -162,8 +162,8 @@ export default function Home() {
               </div>
             ) : (
               Array.isArray(devices) && devices.map((device: any, idx) => (
-                <div 
-                  key={device._id || device.mac || Math.random()} 
+                <div
+                  key={device._id || device.mac || Math.random()}
                   className="animate-in fade-in slide-in-from-bottom-4 duration-500"
                   style={{ animationDelay: `${idx * 50}ms` }}
                 >

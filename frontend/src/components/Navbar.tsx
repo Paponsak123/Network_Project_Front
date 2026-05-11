@@ -60,7 +60,7 @@ export function Navbar() {
               </div>
               <div className="flex flex-col leading-none">
                 <span className="font-black text-xl tracking-tighter text-zinc-900 dark:text-white">
-                  Scanner<span className="text-indigo-600">.</span>
+                  ScanDer<span className="text-indigo-600">.</span>
                 </span>
               </div>
             </Link>

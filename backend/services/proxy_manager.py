@@ -29,18 +29,21 @@ def get_network_services():
 def apply_proxy_pac(has_active_domains: bool):
     """Enable or disable the PAC file on all active network interfaces."""
     port = 3000 # Default port of our API
-    pac_url = f"http://127.0.0.1:{port}/api/blocker/pac"
+    import time
+    pac_url = f"http://127.0.0.1:{port}/api/blocker/pac?t={int(time.time())}"
     
     services = get_network_services()
     
     for service in services:
         try:
             if has_active_domains:
-                # Set URL
+                # Force refresh by turning off first
+                subprocess.run(["networksetup", "-setautoproxystate", service, "off"], check=True)
+                # Set URL with new timestamp
                 subprocess.run(["networksetup", "-setautoproxyurl", service, pac_url], check=True)
                 # Turn ON
                 subprocess.run(["networksetup", "-setautoproxystate", service, "on"], check=True)
-                logger.info(f"Enabled PAC proxy on {service}")
+                logger.info(f"Enabled PAC proxy on {service} with {pac_url}")
             else:
                 # Turn OFF
                 subprocess.run(["networksetup", "-setautoproxystate", service, "off"], check=True)
