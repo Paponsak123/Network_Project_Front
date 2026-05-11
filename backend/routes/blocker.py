@@ -8,10 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from pymongo import ReturnDocument
 
+from fastapi.responses import PlainTextResponse
+
 from auth_middleware import get_current_user
 from database import get_db
 from helpers import serialize_doc
-from services.hosts_manager import apply_hosts
+from services.proxy_manager import apply_proxy_pac
 
 router = APIRouter()
 
@@ -28,16 +30,13 @@ class BlockedDomainResponse(BaseModel):
     updatedAt: datetime
 
 # ---------- Helper to update system hosts ----------
-def refresh_system_hosts(db, user_id: str):
-    """Fetch active domains for the user and apply them to /etc/hosts."""
-    # We only apply blocks for the currently logged-in user, 
-    # but since /etc/hosts is system-wide, we assume single-user macOS or primary admin usage.
+def refresh_system_proxy(db, user_id: str):
+    """Fetch active domains for the user and apply proxy settings."""
     active_docs = list(db.blocked_domains.find({"owner": ObjectId(user_id), "active": True}))
-    active_domains = [doc["domain"] for doc in active_docs]
     
-    success = apply_hosts(active_domains)
+    success = apply_proxy_pac(len(active_docs) > 0)
     if not success:
-        print("Warning: Failed to apply hosts file changes.")
+        print("Warning: Failed to apply proxy settings.")
 
 # ---------- Extract Domain ----------
 def extract_domain(url: str) -> str:
@@ -57,6 +56,35 @@ def extract_domain(url: str) -> str:
         domain = domain[4:]
         
     return domain.lower()
+
+# ---------- GET /api/blocker/pac ----------
+@router.get("/pac", response_class=PlainTextResponse)
+async def get_pac_file(db = Depends(get_db)):
+    """Generate the Proxy Auto-Configuration (PAC) script."""
+    # Since the OS requests this without auth, we fetch all active blocks globally
+    # In a multi-user environment, this would apply to the whole system.
+    active_docs = list(db.blocked_domains.find({"active": True}))
+    active_domains = [doc["domain"] for doc in active_docs]
+    
+    domains_js_array = ",\n".join([f'        "{domain}"' for domain in active_domains])
+    
+    pac_script = f"""function FindProxyForURL(url, host) {{
+    var blockedDomains = [
+{domains_js_array}
+    ];
+
+    for (var i = 0; i < blockedDomains.length; i++) {{
+        if (dnsDomainIs(host, blockedDomains[i]) || host === blockedDomains[i]) {{
+            // Route to a dead-end proxy
+            return "PROXY 127.0.0.1:9999";
+        }}
+    }}
+
+    // Direct connection for everything else
+    return "DIRECT";
+}}
+"""
+    return pac_script
 
 # ---------- GET /api/blocker/ ----------
 @router.get("/")
@@ -100,7 +128,7 @@ async def add_blocked_domain(
         return_document=ReturnDocument.AFTER
     )
     
-    refresh_system_hosts(db, user_id)
+    refresh_system_proxy(db, user_id)
     return serialize_doc(doc)
 
 # ---------- PUT /api/blocker/{id} ----------
@@ -127,7 +155,7 @@ async def toggle_blocked_domain(
     if not doc:
         raise HTTPException(status_code=404, detail="Domain not found")
         
-    refresh_system_hosts(db, user_id)
+    refresh_system_proxy(db, user_id)
     return serialize_doc(doc)
 
 # ---------- DELETE /api/blocker/{id} ----------
@@ -144,5 +172,5 @@ async def delete_blocked_domain(
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Domain not found")
         
-    refresh_system_hosts(db, user_id)
+    refresh_system_proxy(db, user_id)
     return {"message": "Domain deleted successfully"}
