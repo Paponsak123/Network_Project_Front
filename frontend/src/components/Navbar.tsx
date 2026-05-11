@@ -3,19 +3,19 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MonitorSmartphone, Clock, User, Wifi, LogOut, ChevronDown } from "lucide-react";
+import { Home, MonitorSmartphone, Clock, User, Wifi, LogOut, ChevronDown, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 function getUsernameFromToken(): string {
-    if (typeof window === "undefined") return "";
-    const token = localStorage.getItem("token");
-    if (!token) return "";
-    try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        return payload.username || payload.sub || "";
-    } catch {
-        return "";
-    }
+  if (typeof window === "undefined") return "";
+  const token = localStorage.getItem("token");
+  if (!token) return "";
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.username || payload.sub || "";
+  } catch {
+    return "";
+  }
 }
 
 export function Navbar() {
@@ -27,7 +27,7 @@ export function Navbar() {
 
   useEffect(() => {
     setUsername(localStorage.getItem("displayName") || getUsernameFromToken());
-    
+
     // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -35,7 +35,7 @@ export function Navbar() {
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -44,6 +44,7 @@ export function Navbar() {
   const navItems = [
     { name: "Home", href: "/", icon: Home },
     { name: "Devices", href: "/device", icon: MonitorSmartphone },
+    { name: "Block", href: "/blocker", icon: Shield },
     { name: "History", href: "/history", icon: Clock },
   ];
 
@@ -96,7 +97,7 @@ export function Navbar() {
 
             {/* Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
-              <button 
+              <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:bg-zinc-200 dark:hover:bg-zinc-800 active:scale-95"
               >
@@ -117,7 +118,7 @@ export function Navbar() {
                     <p className="text-sm font-black text-zinc-900 dark:text-white truncate">{username}</p>
                   </div>
                   <div className="p-2">
-                    <button 
+                    <button
                       onClick={handleUnauthorized}
                       className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-rose-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
                     >
@@ -131,27 +132,27 @@ export function Navbar() {
 
           {/* Mobile Profile Trigger (Top Right) */}
           <div className="md:hidden flex items-center gap-3">
-             <button 
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center border border-zinc-200 dark:border-zinc-800"
-              >
-                <User className="w-5 h-5 text-zinc-500" />
-              </button>
-              {isDropdownOpen && (
-                 <div className="fixed top-16 right-4 w-48 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl z-[60] animate-in fade-in slide-in-from-top-4">
-                    <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
-                      <p className="text-sm font-black text-zinc-900 dark:text-white">{username}</p>
-                    </div>
-                    <div className="p-2">
-                      <button 
-                        onClick={handleUnauthorized}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-rose-500"
-                      >
-                        <LogOut className="w-4 h-4" /> Logout
-                      </button>
-                    </div>
-                 </div>
-              )}
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center border border-zinc-200 dark:border-zinc-800"
+            >
+              <User className="w-5 h-5 text-zinc-500" />
+            </button>
+            {isDropdownOpen && (
+              <div className="fixed top-16 right-4 w-48 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl z-[60] animate-in fade-in slide-in-from-top-4">
+                <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
+                  <p className="text-sm font-black text-zinc-900 dark:text-white">{username}</p>
+                </div>
+                <div className="p-2">
+                  <button
+                    onClick={handleUnauthorized}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-rose-500"
+                  >
+                    <LogOut className="w-4 h-4" /> Logout
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
