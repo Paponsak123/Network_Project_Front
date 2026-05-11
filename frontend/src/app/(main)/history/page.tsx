@@ -48,7 +48,7 @@ export default function HistoryPage() {
                 <div className="flex flex-col items-center space-y-3 animate-in fade-in slide-in-from-top-4 duration-1000">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
                         <HistoryIcon className="w-3 h-3" />
-                        Temporal Intelligence
+                        ScanDer records
                     </div>
                     <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white tracking-tighter text-center">
                         History<span className="text-indigo-600">.</span>

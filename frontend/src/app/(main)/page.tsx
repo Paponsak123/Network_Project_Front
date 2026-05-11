@@ -139,8 +139,7 @@ export default function Home() {
                 <LayoutDashboard className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Nodes</h2>
-                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Connected Infrastructure</p>
+                <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Founded Devices</h2>
               </div>
             </div>
           </div>

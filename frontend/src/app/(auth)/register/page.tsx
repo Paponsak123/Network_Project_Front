@@ -37,7 +37,7 @@ export default function RegisterPage() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true"
         },
@@ -49,11 +49,11 @@ export default function RegisterPage() {
       if (!res.ok) throw new Error(data.message || "Registration failed");
 
       setSuccessMsg("Account created successfully! Redirecting to login...");
-      
+
       setTimeout(() => {
         router.push("/login");
       }, 1500);
-      
+
     } catch (err: any) {
       console.error("Registration failed:", err);
       setError(err.message || "An unexpected error occurred");
@@ -65,7 +65,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Create Account"
-      subtitle="Join the Corporate Portal today"
+      subtitle="Join ScanDer today"
       footerText="Already have an account?"
       footerLink="/login"
       footerLinkText="Sign in"
@@ -76,7 +76,7 @@ export default function RegisterPage() {
             {error}
           </div>
         )}
-        
+
         {successMsg && (
           <div className="p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm text-center font-medium flex items-center justify-center gap-2">
             <Icons.CheckCircle />
@@ -108,7 +108,7 @@ export default function RegisterPage() {
           required
           autoComplete="new-password"
         />
-        
+
         <Input
           label="Confirm Password"
           id="confirmPassword"

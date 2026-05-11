@@ -51,7 +51,7 @@ export default function LoginPage() {
   return (
     <AuthLayout
       title="Sign In"
-      subtitle="Welcome back to Corporate Portal"
+      subtitle="Welcome to ScanDer"
       footerText="Don't have an account?"
       footerLink="/register"
       footerLinkText="Sign up"
