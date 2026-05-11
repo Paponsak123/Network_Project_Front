@@ -72,13 +72,13 @@ export default function RegisterPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <div className="p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm text-center">
+          <div className="p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
             {error}
           </div>
         )}
 
         {successMsg && (
-          <div className="p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm text-center font-medium flex items-center justify-center gap-2">
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
             <Icons.CheckCircle />
             {successMsg}
           </div>

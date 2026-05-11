@@ -58,7 +58,7 @@ export default function LoginPage() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <div className="p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm text-center">
+          <div className="p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
             {error}
           </div>
         )}
@@ -95,13 +95,13 @@ export default function LoginPage() {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-4 w-4 rounded border-[#c3c6d6] text-[#003d9b] focus:ring-[#dae2ff] transition-colors cursor-pointer"
+              className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500 bg-zinc-50 dark:bg-zinc-800 transition-colors cursor-pointer"
             />
-            <span className="ml-2.5 text-sm text-[#434654] group-hover/check:text-[#191b23] transition-colors select-none">
+            <span className="ml-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 group-hover/check:text-zinc-900 dark:group-hover/check:text-zinc-200 transition-colors select-none">
               Remember me
             </span>
           </label>
-          <a href="#" className="text-sm font-semibold text-[#003d9b] hover:text-[#0040a2] transition-colors tracking-[0.01em]">
+          <a href="#" className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">
             Forgot password?
           </a>
         </div>
