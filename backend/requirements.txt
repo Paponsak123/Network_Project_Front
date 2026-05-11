@@ -7,3 +7,4 @@ PyJWT>=2.0.0
 mac-vendor-lookup>=0.1.11
 certifi>=2023.0.0
 scapy>=2.5.0
+slowapi>=0.1.8

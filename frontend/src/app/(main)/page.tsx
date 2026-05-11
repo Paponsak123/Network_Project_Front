@@ -55,9 +55,6 @@ export default function Home() {
           setDevices(data.devices);
         }
 
-        // แจ้ง Navbar ให้ refresh ชื่อ Wi-Fi
-        window.dispatchEvent(new Event("wifi-ssid-refresh"));
-        
         // เมื่อเสร็จสิ้น เปลี่ยนเป็น Done แล้วรอ 2 วินาทีก่อน Reset
         setScanStatus("done");
         setTimeout(() => {

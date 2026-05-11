@@ -1,19 +1,16 @@
-"""
-Main FastAPI application.
-Replaces: index.js
-"""
 import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 load_dotenv()
 
 from database import connect, close
-from routes import auth, scan, devices, wifi, kick
-
+from routes import auth, scan, devices, kick
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,7 +28,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow all origins (same as the JS version)
+# ✅ Rate Limiting State & Exception Handler
+from routes.scan import limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS — allow all origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,7 +46,6 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])
 app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
-app.include_router(wifi.router, prefix="/api/wifi", tags=["Wi-Fi"])
 app.include_router(kick.router, prefix="/api/kick", tags=["Kick"])
 
 

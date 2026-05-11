@@ -1,12 +1,13 @@
-"""
-Scan routes — trigger scan, get history.
-Replaces: routes/scanRoutes.js + controllers/scanController.js
-"""
+import asyncio
 from datetime import datetime, timezone
+from typing import List, Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from pymongo import ReturnDocument
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from auth_middleware import get_current_user
 from database import get_db
@@ -14,24 +15,48 @@ from helpers import serialize_doc
 from services.network import perform_full_scan
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
+# ---------- Models ----------
+class DeviceSnapshot(BaseModel):
+    ip: str
+    mac: str
+    vendor: str
+    deviceType: str
+    status: str
+    ports: List[int]
+
+class ScanResponse(BaseModel):
+    message: str
+    scanId: str
+    totalDevices: int
+    devices: List[dict]
 
 # ---------- POST /api/scan ----------
-@router.post("/")
-def trigger_scan(current_user: dict = Depends(get_current_user)):
-    db = get_db()
+@router.post("/", response_model=ScanResponse)
+@limiter.limit("1/minute")
+async def trigger_scan(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Trigger a network scan. Rate limited to 1 per minute."""
     user_id = current_user["id"]
+    now = datetime.now(timezone.utc)
 
-    discovered = perform_full_scan()
+    try:
+        # ✅ Performance: Run blocking scan in a thread pool
+        discovered = await asyncio.to_thread(perform_full_scan)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
 
-    # Safety filter
-    discovered = [
-        d for d in discovered
-        if not d["ip"].endswith(".255") and d["mac"] != "ff:ff:ff:ff:ff:ff"
-    ]
-
-    if len(discovered) == 0:
-        return {"message": "Scan complete. No devices discovered.", "totalDevices": 0, "devices": []}
+    if not discovered:
+        return {
+            "message": "Scan complete. No devices discovered.",
+            "scanId": "",
+            "totalDevices": 0,
+            "devices": []
+        }
 
     # Upsert each device (keyed by MAC + owner)
     saved_devices = []
@@ -45,11 +70,11 @@ def trigger_scan(current_user: dict = Depends(get_current_user)):
                 "status": device["status"],
                 "ports": device["ports"],
                 "lastSeen": device["lastSeen"],
-                "updatedAt": datetime.now(timezone.utc),
+                "updatedAt": now,
             },
             "$setOnInsert": {
                 "customName": "",
-                "createdAt": datetime.now(timezone.utc),
+                "createdAt": now,
             }},
             upsert=True,
             return_document=ReturnDocument.AFTER,
@@ -65,11 +90,11 @@ def trigger_scan(current_user: dict = Depends(get_current_user)):
     # Save scan record
     scan_doc = {
         "scannedBy": ObjectId(user_id),
-        "scanTime": datetime.now(timezone.utc),
+        "scanTime": now,
         "totalDevices": len(snapshots),
         "devices": snapshots,
-        "createdAt": datetime.now(timezone.utc),
-        "updatedAt": datetime.now(timezone.utc),
+        "createdAt": now,
+        "updatedAt": now,
     }
     result = db.scans.insert_one(scan_doc)
 
@@ -83,9 +108,15 @@ def trigger_scan(current_user: dict = Depends(get_current_user)):
 
 # ---------- GET /api/scan/history ----------
 @router.get("/history")
-def get_scan_history(current_user: dict = Depends(get_current_user)):
-    db = get_db()
+async def get_scan_history(
+    page: int = 1,
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Get scan history with pagination."""
     user_id = current_user["id"]
+    skip = (page - 1) * limit
 
     pipeline = [
         {"$match": {"scannedBy": ObjectId(user_id)}},
@@ -96,6 +127,8 @@ def get_scan_history(current_user: dict = Depends(get_current_user)):
             "as": "scannedByUser",
         }},
         {"$sort": {"scanTime": -1}},
+        {"$skip": skip},
+        {"$limit": limit},
     ]
 
     scans = list(db.scans.aggregate(pipeline))
@@ -103,7 +136,6 @@ def get_scan_history(current_user: dict = Depends(get_current_user)):
     result = []
     for scan in scans:
         s = serialize_doc(scan)
-        # Populate scannedBy with username (like Mongoose .populate)
         if s.get("scannedByUser") and len(s["scannedByUser"]) > 0:
             s["scannedBy"] = {
                 "_id": s["scannedByUser"][0]["_id"],
@@ -114,10 +146,13 @@ def get_scan_history(current_user: dict = Depends(get_current_user)):
 
     return result
 
+
 # ---------- GET /api/scan/latest ----------
 @router.get("/latest")
-def get_latest_scan(current_user: dict = Depends(get_current_user)):
-    db = get_db()
+async def get_latest_scan(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
     user_id = current_user["id"]
 
     latest_scan = db.scans.find_one(

@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, MonitorSmartphone, Clock, User, Wifi, LogOut, ChevronDown } from "lucide-react";
-import { fetchSSID } from "@/api/wifi";
 import { useAuth } from "@/hooks/useAuth";
 
 function getUsernameFromToken(): string {
@@ -21,24 +20,13 @@ function getUsernameFromToken(): string {
 
 export function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { handleUnauthorized } = useAuth();
-  const [ssid, setSsid] = useState<string>("Network");
   const [username, setUsername] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const loadSSID = () => {
-    fetchSSID().then((name) => {
-      if (name) setSsid(name);
-    });
-  };
-
   useEffect(() => {
-    loadSSID();
     setUsername(localStorage.getItem("displayName") || getUsernameFromToken());
-    
-    window.addEventListener("wifi-ssid-refresh", loadSSID);
     
     // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
@@ -49,7 +37,6 @@ export function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     
     return () => {
-      window.removeEventListener("wifi-ssid-refresh", loadSSID);
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
@@ -74,7 +61,6 @@ export function Navbar() {
                 <span className="font-black text-xl tracking-tighter text-zinc-900 dark:text-white">
                   Scanner<span className="text-indigo-600">.</span>
                 </span>
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{ssid}</span>
               </div>
             </Link>
           </div>

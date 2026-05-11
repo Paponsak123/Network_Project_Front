@@ -5,45 +5,57 @@ Replaces: services/networkService.js
 import re
 import socket
 import subprocess
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from mac_vendor_lookup import MacLookup
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def exec_command(command, timeout=30):
-    """Execute a shell command and return stdout."""
+# Global MacLookup instance
+_mac_lookup = MacLookup()
+
+def exec_command(command_list, timeout=30):
+    """Execute a shell command securely and return stdout."""
     try:
+        # ✅ Security: Avoid shell=True
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=timeout
+            command_list, capture_output=True, text=True, timeout=timeout
         )
         return result.stdout
     except Exception as e:
-        print(f"Error running command: {e}")
+        logger.error("Error running command %s: %s", command_list, e)
         return ""
 
 
-def get_local_subnet():
-    """Auto-detect the local IP and return the /24 subnet (e.g. 192.168.1.0/24)."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def get_local_subnet() -> str:
+    """Auto-detect the local IP and return the /24 subnet with fallback."""
     try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Doesn't actually connect, just finds the interface
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
-    finally:
         s.close()
+        
+        if local_ip.startswith("127."):
+            return "192.168.1.0/24"
+    except OSError:
+        return "192.168.1.0/24"
+
     prefix = ".".join(local_ip.split(".")[:3])
     return f"{prefix}.0/24"
 
 
 def is_valid_device(ip, mac):
     """Filter out broadcast and multicast IP/MAC addresses."""
-    # บล็อก Broadcast IP 
     if ip.endswith(".255") or ip == "255.255.255.255": 
         return False
-    # บล็อก Multicast IP 
     if ip.startswith("224.") or ip.startswith("239."):
         return False
-    # บล็อก Broadcast MAC 
     if mac == "ff:ff:ff:ff:ff:ff":
         return False
-    # บล็อก Multicast MAC 
     if mac.startswith("01:00:5e") or mac.startswith("33:33:"):
         return False
     return True
@@ -53,29 +65,32 @@ def discover_devices():
     """Use both arp -a (cache) and nmap (active) to discover all devices."""
     devices_by_ip = {}
 
-    # 1. ARP Cache (Finds sleeping/cached devices)
-    arp_output = exec_command("arp -a")
+    # 1. ARP Cache
+    arp_output = exec_command(["arp", "-a"])
     for line in arp_output.split("\n"):
         ip_match = re.search(r"\((\d+\.\d+\.\d+\.\d+)\)", line)
         mac_match = re.search(r"([0-9a-fA-F]{1,2}(?::[0-9a-fA-F]{1,2}){5})", line)
         if ip_match and mac_match:
             ip = ip_match.group(1)
             mac = mac_match.group(1).lower()
-            # Normalize mac (e.g. 0:a:b:c:d:e to 00:0a:0b:0c:0d:0e)
             mac_parts = mac.split(":")
             mac = ":".join([p.zfill(2) for p in mac_parts])
             
             if is_valid_device(ip, mac):
                 devices_by_ip[ip] = mac
 
-    # 2. Nmap Active Scan (Finds newly connected devices)
+    # 2. Nmap Active Scan
     subnet = get_local_subnet()
-    print(f"🔍 Scanning subnet: {subnet}")
-    nmap_output = exec_command(f"nmap -sn -n {subnet}", timeout=60)
+    logger.info("🔍 Scanning subnet: %s", subnet)
+    # ✅ Security: command as list
+    nmap_output = exec_command(["nmap", "-sn", "-n", subnet], timeout=60)
     current_ip = None
 
     for line in nmap_output.split("\n"):
-        ip_match = re.search(r"Nmap scan report for\s+.*?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", line)
+        # ✅ Improved Regex to handle hostnames
+        ip_match = re.search(
+            r"Nmap scan report for\s+(?:\S+\s+)?\(?(\d{1,3}(?:\.\d{1,3}){3})\)?", line
+        )
         if ip_match:
             current_ip = ip_match.group(1)
             continue
@@ -87,14 +102,18 @@ def discover_devices():
                 devices_by_ip[current_ip] = mac
             current_ip = None
 
-    # Return combined list
     return [{"ip": ip, "mac": mac} for ip, mac in devices_by_ip.items()]
 
 
 def scan_device(ip):
     """Run nmap on a single IP to discover open ports."""
     try:
-        output = exec_command(f"nmap -Pn -n --top-ports 1000 --host-timeout 15s --max-retries 1 {ip}", timeout=45)
+        # ✅ Security: command as list
+        output = exec_command([
+            "nmap", "-Pn", "-n", "--top-ports", "1000", 
+            "--host-timeout", "15s", "--max-retries", "1", ip
+        ], timeout=45)
+        
         lines = output.split("\n")
         status = "offline"
         ports = []
@@ -108,7 +127,7 @@ def scan_device(ip):
 
         return {"ip": ip, "status": status, "ports": ports}
     except Exception as e:
-        print(f"Error scanning {ip}: {e}")
+        logger.warning("Error scanning %s: %s", ip, e)
         return {"ip": ip, "status": "offline", "ports": []}
 
 
@@ -124,13 +143,9 @@ def is_randomized_mac(mac):
 
 
 def get_vendor(mac):
-    """Look up MAC vendor. Falls back to 'Unknown' or 'Randomized MAC'."""
+    """Look up MAC vendor using global instance."""
     try:
-        from mac_vendor_lookup import MacLookup
-        lookup = MacLookup()
-        vendor = lookup.lookup(mac)
-        if vendor:
-            return vendor
+        return _mac_lookup.lookup(mac)
     except Exception:
         pass
 
@@ -139,13 +154,36 @@ def get_vendor(mac):
     return "Unknown"
 
 
-def perform_full_scan():
-    """Full scan pipeline: ARP discovery → nmap scan → merge results."""
-    arp_devices = discover_devices()
+def guess_device_type(ports: list, vendor: str) -> str:
+    """Heuristic to guess device type based on open ports and vendor."""
+    port_set = set(ports)
+    if 80 in port_set or 443 in port_set:
+        return "Router/Server"
+    if 9100 in port_set:
+        return "Printer"
+    if 554 in port_set:
+        return "IP Camera"
+    
+    vendor_lower = vendor.lower()
+    if "apple" in vendor_lower:
+        return "Apple Device"
+    if "samsung" in vendor_lower or "google" in vendor_lower:
+        return "Mobile/TV"
+    
+    return "Unknown"
 
+
+def perform_full_scan():
+    """Full scan pipeline with parallel execution."""
+    arp_devices = discover_devices()
+    now = datetime.now(timezone.utc)
+
+    # ✅ Performance: Sequential -> Parallel
     scan_results = []
-    for device in arp_devices:
-        scan_results.append(scan_device(device["ip"]))
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(scan_device, d["ip"]): d for d in arp_devices}
+        for future in as_completed(futures):
+            scan_results.append(future.result())
 
     merged = []
     for arp_device in arp_devices:
@@ -159,10 +197,10 @@ def perform_full_scan():
             "ip": arp_device["ip"],
             "mac": arp_device["mac"],
             "vendor": vendor_name,
-            "deviceType": "Unknown",
+            "deviceType": guess_device_type(nmap_result["ports"], vendor_name),
             "status": nmap_result["status"],
             "ports": nmap_result["ports"],
-            "lastSeen": datetime.utcnow(),
+            "lastSeen": now,
         })
 
     return merged

