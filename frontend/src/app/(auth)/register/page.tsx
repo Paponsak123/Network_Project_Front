@@ -6,6 +6,7 @@ import { AuthLayout } from "@/components/AuthLayout";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { Icons } from "@/components/Icons";
+import { getApiUrl } from "@/utils/config";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function RegisterPage() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
+      const res = await fetch(`${getApiUrl()}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

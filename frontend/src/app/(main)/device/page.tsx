@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getActiveKicks } from "@/api/kick";
 import DeviceDetailModal from "@/components/deviceDetail";
 import { MonitorSmartphone, ShieldAlert, Cpu, Laptop, Smartphone, Server, Loader2, Database, History } from "lucide-react";
+import { getApiUrl } from "@/utils/config";
 
 interface DeviceRecord {
     ip: string;
@@ -34,7 +35,7 @@ export default function DevicePage() {
     const loadLatestDevices = () => {
         setIsLoading(true);
         Promise.all([
-            fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/scan/latest`).then(res => res.json()),
+            fetchWithAuth(`${getApiUrl()}/api/scan/latest`).then(res => res.json()),
             getActiveKicks(fetchWithAuth).catch(() => []),
         ])
             .then(([latestScan, activeKicks]) => {

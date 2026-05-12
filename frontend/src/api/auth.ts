@@ -1,4 +1,5 @@
-const API = process.env.NEXT_PUBLIC_API_URL;
+import { getApiUrl } from "@/utils/config";
+const API = getApiUrl();
 
 /**
  * อัปเดตชื่อผู้ใช้

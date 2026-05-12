@@ -6,6 +6,7 @@ import { triggerScan } from "@/api/scan";
 import Card from "@/components/Card";
 import CircularScanner from "@/components/CircularScanner";
 import { Info, Activity, Database, LayoutDashboard } from "lucide-react";
+import { getApiUrl } from "@/utils/config";
 
 export default function Home() {
   const { fetchWithAuth } = useAuth();
@@ -19,7 +20,7 @@ export default function Home() {
   const loadDevices = () => {
     setIsLoading(true);
     setError(null);
-    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/scan/latest`)
+    fetchWithAuth(`${getApiUrl()}/api/scan/latest`)
       .then((res) => res.json())
       .then((data) => {
         setDevices(data.devices || []);

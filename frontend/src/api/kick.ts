@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+import { getApiUrl } from "@/utils/config";
+const API_URL = getApiUrl();
 
 export async function kickDevice(
     fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>,

@@ -6,6 +6,7 @@ import { AuthLayout } from "@/components/AuthLayout";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { Icons } from "@/components/Icons";
+import { getApiUrl } from "@/utils/config";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+      const res = await fetch(`${getApiUrl()}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

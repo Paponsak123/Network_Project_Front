@@ -1,4 +1,5 @@
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+import { getApiUrl } from "@/utils/config";
+const API = getApiUrl();
 
 /**
  * ดึงรายการเว็บที่บล็อกทั้งหมด
