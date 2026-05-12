@@ -19,4 +19,4 @@ COPY . /app
 EXPOSE 8000
 
 # ใช้ 0.0.0.0 เพื่อให้สามารถเข้าถึง Backend จากภายนอก Container ได้
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
