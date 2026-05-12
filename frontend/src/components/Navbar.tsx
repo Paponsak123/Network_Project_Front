@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MonitorSmartphone, Clock, User, Wifi, LogOut, ChevronDown, Shield } from "lucide-react";
+import { Home, MonitorSmartphone, Clock, User, LogOut, ChevronDown, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 function getUsernameFromToken(): string {
@@ -55,9 +55,11 @@ export function Navbar() {
           {/* Logo / Brand */}
           <div className="flex-shrink-0 flex items-center">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20 group-hover:scale-105 transition-all duration-300">
-                <Wifi className="w-5 h-5" />
-              </div>
+              <img
+              src="/shrimp.png"
+              alt="ScanDer logo"
+              className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-all duration-300"
+/>
               <div className="flex flex-col leading-none">
                 <span className="font-black text-xl tracking-tighter text-zinc-900 dark:text-white">
                   ScanDer<span className="text-indigo-600">.</span>
