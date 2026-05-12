@@ -24,7 +24,7 @@ export async function addBlockedDomain(
     },
     body: JSON.stringify({ url }),
   });
-  
+
   if (!res.ok) {
     const errorData = await res.json();
     throw new Error(errorData.detail || "Failed to add domain");
@@ -43,7 +43,7 @@ export async function toggleBlockedDomain(
   const res = await fetchWithAuth(`${API}/api/blocker/${id}?active=${active}`, {
     method: "PUT",
   });
-  
+
   if (!res.ok) throw new Error("Failed to toggle domain status");
   return res.json();
 }
@@ -58,7 +58,7 @@ export async function deleteBlockedDomain(
   const res = await fetchWithAuth(`${API}/api/blocker/${id}`, {
     method: "DELETE",
   });
-  
+
   if (!res.ok) throw new Error("Failed to delete domain");
   return res.json();
 }

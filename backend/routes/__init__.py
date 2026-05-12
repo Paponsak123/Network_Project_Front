@@ -1,1 +1,1 @@
-# routes package
+from . import auth, scan, devices, kick, monitor

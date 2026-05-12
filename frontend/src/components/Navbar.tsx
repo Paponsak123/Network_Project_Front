@@ -44,7 +44,6 @@ export function Navbar() {
   const navItems = [
     { name: "Home", href: "/", icon: Home },
     { name: "Devices", href: "/device", icon: MonitorSmartphone },
-    { name: "Block", href: "/blocker", icon: Shield },
     { name: "History", href: "/history", icon: Clock },
   ];
 

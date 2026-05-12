@@ -33,9 +33,8 @@ export default function Card({ device }: DeviceCardProps) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           {/* Icon Container */}
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-300 ${
-            isOnline ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"
-          }`}>
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-300 ${isOnline ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"
+            }`}>
             {getDeviceIcon(device.vendor)}
           </div>
 
@@ -50,9 +49,8 @@ export default function Card({ device }: DeviceCardProps) {
         </div>
 
         {/* Status Badge */}
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-          isOnline ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
-        }`}>
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${isOnline ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
+          }`}>
           <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
           {isOnline ? "Live" : "Idle"}
         </div>
@@ -68,11 +66,17 @@ export default function Card({ device }: DeviceCardProps) {
           <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">{device.mac}</span>
         </div>
       </div>
-      
+
       {/* Hover Reveal Action (Subtle) */}
       <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <Globe className="w-4 h-4 text-zinc-200 dark:text-zinc-800" />
       </div>
     </div>
+  );
+}
+<RotateCcw className="w-4 h-4" />
+        </button >
+      </div >
+    </div >
   );
 }
