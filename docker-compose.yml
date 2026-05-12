@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: network_scanner_backend
+    # ใช้ network_mode: "host" เพื่อให้ backend เห็น Network วงเดียวกับเครื่อง Server ที่รัน
+    # เป็นการรับประกันว่าจะสามารถสแกน Router และเครื่องอื่นๆ ในบริษัทได้
+    network_mode: "host"
+    # privileged: true จำเป็นสำหรับการทำ ARP Scan และการใช้งาน Scapy ที่ต้องเข้าถึง Network interface ระดับลึก
+    privileged: true
+    env_file:
+      - ./backend/.env # ดึงตัวแปรสภาพแวดล้อม (เช่น MONGODB_URI) จากไฟล์ .env ของ backend
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: network_scanner_frontend
+    ports:
+      - "3000:3000" # Map port 3000 ของ Container ออกมาที่ 3000 ของเครื่อง Host
+    environment:
+      # ตั้งค่าให้ Frontend ชี้ไปหา Backend ที่รันอยู่บน localhost:8000 (เนื่องจาก Backend ใช้โหมด host)
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
