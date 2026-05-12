@@ -5,7 +5,7 @@ const API = getApiUrl();
  * เริ่มสแกนเครือข่าย
  */
 export async function triggerScan(fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>) {
-  const res = await fetchWithAuth(`${API}/api/scan`, { method: "POST" });
+  const res = await fetchWithAuth(`${API}/api/scan/`, { method: "POST" });
   return res.json();
 }
 

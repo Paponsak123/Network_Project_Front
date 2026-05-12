@@ -34,7 +34,7 @@ class ScanResponse(BaseModel):
 
 # ---------- POST /api/scan ----------
 @router.post("/", response_model=ScanResponse)
-@limiter.limit("1/minute")
+@limiter.limit("8/minute")
 async def trigger_scan(
     request: Request,
     current_user: dict = Depends(get_current_user),

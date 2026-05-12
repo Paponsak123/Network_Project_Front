@@ -8,8 +8,10 @@ services:
     container_name: network_scanner_backend
     # ใช้ network_mode: "host" เพื่อให้ backend เห็น Network วงเดียวกับเครื่อง Server ที่รัน
     # เป็นการรับประกันว่าจะสามารถสแกน Router และเครื่องอื่นๆ ในบริษัทได้
-    network_mode: "host"
-    # privileged: true จำเป็นสำหรับการทำ ARP Scan และการใช้งาน Scapy ที่ต้องเข้าถึง Network interface ระดับลึก
+    # network_mode: "host" ใช้ไม่ได้ผลบนเครื่อง Mac (Docker for Mac สร้าง VM ขั้นกลางไว้)
+    # ทำให้เราต้องใช้วิธี Map Port ออกมาแทน เพื่อให้ Frontend สามารถเชื่อมต่อหา Backend ได้
+    ports:
+      - "8000:8000"
     privileged: true
     env_file:
       - ./backend/.env # ดึงตัวแปรสภาพแวดล้อม (เช่น MONGODB_URI) จากไฟล์ .env ของ backend
