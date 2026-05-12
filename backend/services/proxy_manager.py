@@ -3,6 +3,7 @@ macOS Proxy Configuration Manager for Website Blocking (PAC file).
 """
 import subprocess
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def get_network_services():
 
 def apply_proxy_pac(has_active_domains: bool):
     """Enable or disable the PAC file on all active network interfaces."""
-    port = 3000 # Default port of our API
+    port = os.environ.get("PORT", "8000")
     import time
     pac_url = f"http://127.0.0.1:{port}/api/blocker/pac?t={int(time.time())}"
     
