@@ -15,29 +15,109 @@ from routes import auth, scan, devices, kick, monitor
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: connect to MongoDB. Shutdown: close connection + restore ARP."""
+    """Startup: connect MongoDB, warm fingerprint cache, start sniffer + flush.
+    Shutdown: stop kicks, flush cache to DB, close connection."""
     import asyncio
-    from database import connect, close
+    import threading
+    import time
+    from datetime import datetime, timezone
+    from database import connect, close, get_db
     from services.monitor import set_main_loop
     from services.fingerprint import start_fingerprinting
     from services.arp_spoof import stop_all_kicks
+    from services.cache import get_cache
+
+    log = logging.getLogger(__name__)
 
     set_main_loop(asyncio.get_running_loop())
-    start_fingerprinting()
     connect()
+
+    # Initialise the cache (loads Redis client or falls back to in-memory).
+    cache = get_cache()
+    log.info("FingerprintCache mode=%s", cache.mode)
+
+    # Warm cache from MongoDB.raw_signals so we don't lose context on restart.
+    try:
+        db = get_db()
+        if db is not None:
+            seeded = 0
+            for dev in db.devices.find({"raw_signals": {"$exists": True}}, {"mac": 1, "raw_signals": 1}):
+                mac = (dev.get("mac") or "").lower()
+                signals = dev.get("raw_signals") or {}
+                passive = signals.get("passive") if isinstance(signals, dict) else None
+                if mac and isinstance(passive, dict):
+                    cache.seed_from_dict(mac, passive)
+                    seeded += 1
+            if seeded:
+                log.info("Warmed fingerprint cache from %d device records", seeded)
+    except Exception:
+        log.exception("Cache warm-load failed (non-fatal)")
+
+    # Sniffer (only the worker that wins the Redis lock will actually start).
+    start_fingerprinting()
+
+    # Background flush: every 60s persist freshly-seen signals to MongoDB so
+    # restarts (and Redis flushes) don't lose long-term context.
+    flush_stop = threading.Event()
+
+    def _flush_to_db() -> None:
+        while not flush_stop.is_set():
+            flush_stop.wait(60.0)
+            if flush_stop.is_set():
+                return
+            try:
+                db = get_db()
+                if db is None:
+                    continue
+                now = datetime.now(timezone.utc)
+                count = 0
+                for mac in cache.iter_macs_with_passive_signals():
+                    passive = cache.get_passive_signals(mac)
+                    if not passive:
+                        continue
+                    db.devices.update_one(
+                        {"mac": mac.lower()},
+                        {"$set": {
+                            "raw_signals.passive": passive,
+                            "raw_signals.snapshot_at": now,
+                        }},
+                        upsert=False,
+                    )
+                    count += 1
+                if count:
+                    log.debug("Flushed signals for %d MACs to MongoDB", count)
+            except Exception:
+                log.exception("Background flush failed")
+
+    threading.Thread(target=_flush_to_db, daemon=True, name="fp-db-flush").start()
+
     try:
         yield
     finally:
+        flush_stop.set()
         # Always restore ARP state before going away — otherwise targets are
         # left disconnected after a server restart.
         try:
             restored = stop_all_kicks()
             if restored:
-                logging.getLogger(__name__).info(
-                    "Restored ARP for %d active kicks on shutdown", restored
-                )
+                log.info("Restored ARP for %d active kicks on shutdown", restored)
         except Exception:
-            logging.getLogger(__name__).exception("Failed to restore ARP on shutdown")
+            log.exception("Failed to restore ARP on shutdown")
+        # Final flush attempt so we don't lose the last 60s of signals.
+        try:
+            db = get_db()
+            if db is not None:
+                now = datetime.now(timezone.utc)
+                for mac in cache.iter_macs_with_passive_signals():
+                    passive = cache.get_passive_signals(mac)
+                    if passive:
+                        db.devices.update_one(
+                            {"mac": mac.lower()},
+                            {"$set": {"raw_signals.passive": passive, "raw_signals.snapshot_at": now}},
+                            upsert=False,
+                        )
+        except Exception:
+            log.exception("Final flush failed")
         close()
 
 

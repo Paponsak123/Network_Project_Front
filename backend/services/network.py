@@ -150,29 +150,29 @@ def detect_os(ip):
 
 
 def scan_device(ip):
-    """Run nmap on a single IP to discover open ports."""
-    try:
-        # ✅ Security: command as list
-        output = exec_command([
-            "nmap", "-Pn", "-n", "--top-ports", "1000", 
-            "--host-timeout", "15s", "--max-retries", "1", ip
-        ], timeout=45)
-        
-        lines = output.split("\n")
-        status = "offline"
-        ports = []
+    output = exec_command([
+        "nmap", "-Pn", "-n", "--top-ports", "1000",
+        "-sV",          # ← ADD: service/version detection
+        "-O",           # ← ADD: OS detection (needs sudo)
+        "--host-timeout", "15s", "--max-retries", "1", ip
+    ], timeout=60)
 
-        for line in lines:
-            if "Host is up" in line:
-                status = "online"
-            port_match = re.match(r"^(\d+)/tcp\s+open\s+(.+)$", line)
-            if port_match:
-                ports.append(int(port_match.group(1)))
+    lines = output.split("\n")
+    status = "offline"
+    ports = []
+    os_guess = None
 
-        return {"ip": ip, "status": status, "ports": ports}
-    except Exception as e:
-        logger.warning("Error scanning %s: %s", ip, e)
-        return {"ip": ip, "status": "offline", "ports": []}
+    for line in lines:
+        if "Host is up" in line:
+            status = "online"
+        port_match = re.match(r"^(\d+)/tcp\s+open\s+(.+)$", line)
+        if port_match:
+            ports.append(int(port_match.group(1)))
+        os_match = re.search(r"OS details:\s+(.+)", line)
+        if os_match:
+            os_guess = os_match.group(1)
+
+    return {"ip": ip, "status": status, "ports": ports, "os_guess": os_guess}
 
 
 def is_randomized_mac(mac):
@@ -240,11 +240,12 @@ def perform_full_scan():
         merged.append({
             "ip": arp_device["ip"],
             "mac": arp_device["mac"],
-            "vendor": vendor_name,
-            "deviceType": guess_device_type(nmap_result["ports"], vendor_name),
-            "status": nmap_result["status"],
-            "ports": nmap_result["ports"],
-            "lastSeen": now,
+             "vendor": vendor_name,
+             "deviceType": guess_device_type(nmap_result["ports"], vendor_name),
+             "status": nmap_result["status"],
+             "ports": nmap_result["ports"],
+             "os": nmap_result.get("os_guess"),   # ← ADD THIS
+             "lastSeen": now,    
         })
 
     return merged

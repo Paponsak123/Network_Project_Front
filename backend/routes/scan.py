@@ -69,6 +69,7 @@ async def trigger_scan(
                 "deviceType": device["deviceType"],
                 "status": device["status"],
                 "ports": device["ports"],
+                "os": device.get("os"),  
                 "lastSeen": device["lastSeen"],
                 "updatedAt": now,
             },
