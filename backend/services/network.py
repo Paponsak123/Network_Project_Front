@@ -128,6 +128,29 @@ def discover_devices():
     return [{"ip": ip, "mac": mac} for ip, mac in devices_by_ip.items()]
 
 
+def detect_os(ip):
+    """Use nmap -O to try and detect the operating system."""
+    try:
+        # ✅ Needs sudo for OS detection
+        output = exec_command([
+            "sudo", "nmap", "-O", "-Pn", "--osscan-limit", "--max-os-tries", "1", ip
+        ], timeout=60)
+        
+        match = re.search(r"OS details:\s+(.+)", output)
+        if match:
+            return match.group(1)
+        
+        if "Aggressive OS guesses" in output:
+            guess_match = re.search(r"Aggressive OS guesses:\s+([^,]+)", output)
+            if guess_match:
+                return guess_match.group(1)
+            
+        return "Unknown OS"
+    except Exception as e:
+        logger.warning("OS Detection error for %s: %s", ip, e)
+        return "Unknown OS"
+
+
 def scan_device(ip):
     """Run nmap on a single IP to discover open ports."""
     try:

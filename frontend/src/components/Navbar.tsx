@@ -8,11 +8,28 @@ import { useAuth } from "@/hooks/useAuth";
 
 function getUsernameFromToken(): string {
   if (typeof window === "undefined") return "";
-  const token = localStorage.getItem("token");
-  if (!token) return "";
+  let token: string | null = null;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.username || payload.sub || "";
+    token = localStorage.getItem("token");
+  } catch {
+    return "";
+  }
+  if (!token) return "";
+
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return "";
+
+    // JWT payload is base64url; convert to standard base64 and pad before atob.
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+
+    const json = atob(b64);
+    const payload = JSON.parse(json);
+    if (payload && typeof payload === "object") {
+      return payload.username || payload.sub || "";
+    }
+    return "";
   } catch {
     return "";
   }
@@ -26,7 +43,13 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setUsername(localStorage.getItem("displayName") || getUsernameFromToken());
+    let displayName = "";
+    try {
+      displayName = localStorage.getItem("displayName") || "";
+    } catch {
+      /* storage disabled */
+    }
+    setUsername(displayName || getUsernameFromToken());
 
     // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {

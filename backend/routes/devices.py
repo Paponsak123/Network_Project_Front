@@ -43,3 +43,26 @@ def update_device_name(device_id: str, request_body: dict, current_user: dict = 
         return {"message": "Device not found."}, 404
 
     return {"message": "Device name updated.", "device": serialize_doc(device)}
+
+
+# ---------- POST /api/devices/{device_id}/fingerprint ----------
+from services.network import detect_os
+
+@router.post("/{device_id}/fingerprint")
+def fingerprint_device(device_id: str, current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    device = db.devices.find_one({"_id": ObjectId(device_id), "owner": ObjectId(current_user["id"])})
+    
+    if not device:
+        return {"message": "Device not found."}, 404
+        
+    # Perform active OS detection
+    os_details = detect_os(device["ip"])
+    
+    # Update DB
+    db.devices.update_one(
+        {"_id": ObjectId(device_id)},
+        {"$set": {"os": os_details, "updatedAt": datetime.now(timezone.utc)}}
+    )
+    
+    return {"message": "Fingerprinting complete.", "os": os_details}

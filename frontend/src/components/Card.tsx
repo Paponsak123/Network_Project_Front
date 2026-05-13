@@ -1,5 +1,5 @@
 import React from "react";
-import { Laptop, Smartphone, Monitor, Cpu, ShieldCheck, ShieldAlert, Globe, Server } from "lucide-react";
+import { Laptop, Smartphone, Monitor, Cpu, Server, Globe } from "lucide-react";
 
 interface Device {
   _id?: string;
@@ -26,7 +26,7 @@ export default function Card({ device }: DeviceCardProps) {
   const isOnline = device.status === "online";
 
   return (
-    <div className="group relative p-5 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 overflow-hidden">
+    <div className="group relative p-5 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 overflow-hidden cursor-pointer">
       {/* Status Accent Line */}
       <div className={`absolute top-0 left-0 w-1 h-full ${isOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
 
@@ -67,16 +67,10 @@ export default function Card({ device }: DeviceCardProps) {
         </div>
       </div>
 
-      {/* Hover Reveal Action (Subtle) */}
-      <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <Globe className="w-4 h-4 text-zinc-200 dark:text-zinc-800" />
+      {/* Hover Reveal Action */}
+      <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <Globe className="w-4 h-4 text-indigo-500" />
       </div>
     </div>
-  );
-}
-<RotateCcw className="w-4 h-4" />
-        </button >
-      </div >
-    </div >
   );
 }

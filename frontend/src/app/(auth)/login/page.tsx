@@ -7,6 +7,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { Icons } from "@/components/Icons";
 import { getApiUrl } from "@/utils/config";
+import { fetchClient, isAbortError } from "@/utils/fetchClient";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,28 +23,49 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await fetch(`${getApiUrl()}/api/auth/login`, {
+      const res = await fetchClient(`${getApiUrl()}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({ username, password }),
+        // Login is idempotent on the server side — allow one retry on transient 5xx.
+        retries: 1,
+        forceRetry: true,
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        /* empty / non-JSON body */
+      }
 
-      if (!res.ok) throw new Error(data.message || "Invalid credentials");
+      if (!res.ok) {
+        const msg = data?.detail?.message || data?.message || "Invalid credentials";
+        throw new Error(msg);
+      }
 
-      if (data.token) {
-        localStorage.setItem("token", data.token);
+      if (data?.token) {
+        try {
+          localStorage.setItem("token", data.token);
+        } catch {
+          // localStorage disabled (private mode etc.) — surface clearly.
+          throw new Error("Browser storage is disabled. Please enable it and try again.");
+        }
         router.push("/");
       } else {
         throw new Error("No token received from server");
       }
     } catch (err: any) {
-      console.error("Login failed:", err);
-      setError(err.message || "An unexpected error occurred");
+      const aborted = isAbortError(err);
+      if (!aborted) console.error("Login failed:", err);
+      setError(
+        aborted
+          ? "Server is taking too long to respond. Please try again."
+          : err?.message || "An unexpected error occurred"
+      );
     } finally {
       setIsLoading(false);
     }

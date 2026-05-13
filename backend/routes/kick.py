@@ -1,46 +1,106 @@
 """
-Kick routes — ARP spoof to disconnect/reconnect devices.
+Routes for the "kick" feature (ARP spoofing based device disconnect).
+Replaces the previous thin wrapper around start_kick/stop_kick.
+
+The route layer:
+  - Validates and normalises input (IP/MAC) via Pydantic
+  - Maps service-level ValueError → HTTP 400 (bad input)
+  - Maps unexpected exceptions → HTTP 500 with a logged stack trace
+  - Returns the richer status dict produced by the service so the UI can show
+    interface / gateway / "is this kick actually working?".
 """
+import logging
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from auth_middleware import get_current_user
-from services.arp_spoof import start_spoof, stop_spoof, get_active_spoofs
+from services.arp_spoof import (
+    get_active_kicks,
+    normalize_mac,
+    start_kick,
+    stop_kick,
+    validate_ip,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# --- input models ----------------------------------------------------------
 class KickRequest(BaseModel):
-    ip: str
-    mac: str
+    ip: str = Field(..., min_length=7, max_length=15)
+    mac: str = Field(..., min_length=11, max_length=17)
+    mode: str = Field("kick", pattern="^(kick|redirect)$")
+
+    @field_validator("ip")
+    @classmethod
+    def _ip_must_be_valid(cls, v: str) -> str:
+        out = validate_ip(v)
+        if not out:
+            raise ValueError("Invalid IPv4 address")
+        return out
+
+    @field_validator("mac")
+    @classmethod
+    def _mac_must_be_valid(cls, v: str) -> str:
+        out = normalize_mac(v)
+        if not out:
+            raise ValueError("Invalid MAC address")
+        return out
 
 
 class StopKickRequest(BaseModel):
-    ip: str
+    ip: str = Field(..., min_length=7, max_length=15)
+
+    @field_validator("ip")
+    @classmethod
+    def _ip_must_be_valid(cls, v: str) -> str:
+        out = validate_ip(v)
+        if not out:
+            raise ValueError("Invalid IPv4 address")
+        return out
 
 
-# ---------- POST /api/kick/ ----------
+# --- routes ----------------------------------------------------------------
 @router.post("/")
 def kick_device(body: KickRequest, current_user: dict = Depends(get_current_user)):
     """Start ARP spoofing to disconnect a device from the network."""
-    success = start_spoof(body.ip, body.mac)
-    if not success:
-        raise HTTPException(status_code=409, detail={"message": f"{body.ip} is already being kicked."})
-    return {"message": f"🚫 Kicked {body.ip} ({body.mac}) from the network.", "ip": body.ip}
+    try:
+        status = start_kick(body.ip, body.mac, mode=body.mode)
+    except ValueError as e:
+        # Input/preflight problem — user can fix this.
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        logger.exception("kick failed for %s/%s", body.ip, body.mac)
+        raise HTTPException(status_code=500, detail={"message": f"Internal error: {e}"})
+
+    return {
+        "message": f"Kicked {body.ip} ({body.mac}) from the network.",
+        **status,
+    }
 
 
-# ---------- POST /api/kick/stop ----------
 @router.post("/stop")
-def stop_kick(body: StopKickRequest, current_user: dict = Depends(get_current_user)):
-    """Stop ARP spoofing and restore normal network for the device."""
-    success = stop_spoof(body.ip)
-    if not success:
-        raise HTTPException(status_code=404, detail={"message": f"{body.ip} is not being kicked."})
-    return {"message": f"✅ Released {body.ip} back to the network.", "ip": body.ip}
+def release_device(body: StopKickRequest, current_user: dict = Depends(get_current_user)):
+    """Stop ARP spoofing and restore connection for a device."""
+    try:
+        status = stop_kick(body.ip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)})
+    except Exception as e:
+        logger.exception("stop_kick failed for %s", body.ip)
+        raise HTTPException(status_code=500, detail={"message": f"Internal error: {e}"})
+
+    if not status.get("stopped"):
+        # Not really an error — caller asked us to stop something that wasn't running.
+        return {"message": f"No active kick for {body.ip}.", **status}
+
+    return {"message": f"Released {body.ip}.", **status}
 
 
-# ---------- GET /api/kick/active ----------
 @router.get("/active")
-def list_active_kicks(current_user: dict = Depends(get_current_user)):
-    """List all devices currently being kicked."""
-    return get_active_spoofs()
+def active_kicks(current_user: dict = Depends(get_current_user)):
+    """Get list of currently active kicks with effectiveness info."""
+    return get_active_kicks()

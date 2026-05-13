@@ -28,18 +28,25 @@ export default function HistoryPage() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
+        let cancelled = false;
         fetchScanHistory(fetchWithAuth)
             .then((data) => {
-                setScans(data);
+                if (cancelled) return;
+                setScans(Array.isArray(data) ? (data as ScanRecord[]) : []);
                 setIsLoading(false);
             })
             .catch((err) => {
-                if (err.message !== "Unauthorized") {
+                if (cancelled) return;
+                if (err?.message !== "Unauthorized") {
                     console.error("Load error:", err);
+                    setScans([]);
                     setIsLoading(false);
                 }
             });
-    }, []);
+        return () => {
+            cancelled = true;
+        };
+    }, [fetchWithAuth]);
 
     return (
         <div className="p-6 md:p-10">

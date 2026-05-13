@@ -1,46 +1,65 @@
 import { getApiUrl } from "@/utils/config";
+import type { FetchClientOptions } from "@/utils/fetchClient";
+
 const API_URL = getApiUrl();
 
-export async function kickDevice(
-    fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>,
-    ip: string,
-    mac: string
-) {
+type Fetcher = (url: string, options?: FetchClientOptions) => Promise<Response>;
+
+async function safeJson(res: Response): Promise<any> {
+    try {
+        return await res.json();
+    } catch {
+        return null;
+    }
+}
+
+function pickError(data: any, fallback: string): string {
+    return (
+        data?.detail?.message ||
+        data?.message ||
+        (typeof data?.detail === "string" ? data.detail : "") ||
+        fallback
+    );
+}
+
+/**
+ * เริ่มการเตะอุปกรณ์ออกจากเครือข่าย (Kick)
+ */
+export async function kickDevice(fetchWithAuth: Fetcher, ip: string, mac: string) {
+    if (!ip || !mac) throw new Error("Missing ip or mac");
+
     const res = await fetchWithAuth(`${API_URL}/api/kick/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ip, mac }),
     });
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail?.message || "Failed to kick device");
-    }
-    return res.json();
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(pickError(data, "Failed to kick device"));
+    return data ?? {};
 }
 
-export async function stopKick(
-    fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>,
-    ip: string
-) {
+/**
+ * หยุดการเตะและคืนการเชื่อมต่อ
+ */
+export async function stopKick(fetchWithAuth: Fetcher, ip: string) {
+    if (!ip) throw new Error("Missing ip");
+
     const res = await fetchWithAuth(`${API_URL}/api/kick/stop`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ip }),
     });
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail?.message || "Failed to stop kick");
-    }
-    return res.json();
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(pickError(data, "Failed to stop kick"));
+    return data ?? {};
 }
 
-export async function getActiveKicks(
-    fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>
-) {
+/**
+ * ดึงรายการอุปกรณ์ที่กำลังถูกเตะอยู่
+ */
+export async function getActiveKicks(fetchWithAuth: Fetcher) {
     const res = await fetchWithAuth(`${API_URL}/api/kick/active`);
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail?.message || "Failed to get active kicks");
-    }
-    return res.json();
+    if (!res.ok) return [];
+    const data = await safeJson(res);
+    return Array.isArray(data) ? data : [];
 }

@@ -7,6 +7,7 @@ import Card from "@/components/Card";
 import CircularScanner from "@/components/CircularScanner";
 import { Info, Activity, Database, LayoutDashboard } from "lucide-react";
 import { getApiUrl } from "@/utils/config";
+import { isAbortError } from "@/utils/fetchClient";
 
 export default function Home() {
   const { fetchWithAuth } = useAuth();
@@ -21,9 +22,18 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     fetchWithAuth(`${getApiUrl()}/api/scan/latest`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`Failed to load devices (${res.status})`);
+        }
+        try {
+          return await res.json();
+        } catch {
+          return {};
+        }
+      })
       .then((data) => {
-        setDevices(data.devices || []);
+        setDevices(Array.isArray(data?.devices) ? data.devices : []);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -41,6 +51,9 @@ export default function Home() {
 
   // ฟังก์ชันสำหรับกดปุ่มสแกน
   const handleScan = () => {
+    // กันกดซ้ำตอนยังสแกนอยู่
+    if (isScanning) return;
+
     setIsScanning(true);
     setScanStatus("scanning");
     setIsLoading(true);
@@ -48,12 +61,8 @@ export default function Home() {
 
     triggerScan(fetchWithAuth)
       .then((data) => {
-        if (data && data.message && !data.success && data.message.includes("Access denied")) {
-          setError(data.message);
-        }
-
-        if (data && Array.isArray(data.devices)) {
-          setDevices(data.devices);
+        if (data && typeof data === "object" && Array.isArray((data as any).devices)) {
+          setDevices((data as any).devices);
         }
 
         // เมื่อเสร็จสิ้น เปลี่ยนเป็น Done แล้วรอ 2 วินาทีก่อน Reset
@@ -63,11 +72,17 @@ export default function Home() {
         }, 2000);
       })
       .catch((err) => {
-        if (err.message !== "Unauthorized") {
+        if (err?.message === "Unauthorized") return;
+
+        if (isAbortError(err)) {
+          // Expected when scan exceeds the (already-generous) timeout — don't
+          // pollute the console with a stack trace.
+          setError("การสแกนใช้เวลานานเกินไป โปรดลองอีกครั้ง");
+        } else {
           console.error("Scan error:", err);
-          setError("เกิดข้อผิดพลาดในการสแกน");
-          setScanStatus("idle");
+          setError(err?.message || "เกิดข้อผิดพลาดในการสแกน");
         }
+        setScanStatus("idle");
       })
       .finally(() => {
         setIsScanning(false);
@@ -163,7 +178,8 @@ export default function Home() {
             ) : (
               Array.isArray(devices) && devices.map((device: any, idx) => (
                 <div
-                  key={device._id || device.mac || Math.random()}
+                  // Stable key — Math.random() would force re-mount on every render.
+                  key={device?._id || device?.mac || device?.ip || `device-${idx}`}
                   className="animate-in fade-in slide-in-from-bottom-4 duration-500"
                   style={{ animationDelay: `${idx * 50}ms` }}
                 >

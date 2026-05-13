@@ -7,6 +7,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { Icons } from "@/components/Icons";
 import { getApiUrl } from "@/utils/config";
+import { fetchClient, isAbortError } from "@/utils/fetchClient";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -36,18 +37,28 @@ export default function RegisterPage() {
     }
 
     try {
-      const res = await fetch(`${getApiUrl()}/api/auth/register`, {
+      // Registration is NOT auto-retried — duplicate writes would create double users.
+      const res = await fetchClient(`${getApiUrl()}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({ username, password }),
+        retries: 0,
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        /* empty body */
+      }
 
-      if (!res.ok) throw new Error(data.message || "Registration failed");
+      if (!res.ok) {
+        const msg = data?.detail?.message || data?.message || "Registration failed";
+        throw new Error(msg);
+      }
 
       setSuccessMsg("Account created successfully! Redirecting to login...");
 
@@ -56,8 +67,13 @@ export default function RegisterPage() {
       }, 1500);
 
     } catch (err: any) {
-      console.error("Registration failed:", err);
-      setError(err.message || "An unexpected error occurred");
+      const aborted = isAbortError(err);
+      if (!aborted) console.error("Registration failed:", err);
+      setError(
+        aborted
+          ? "Server is taking too long to respond. Please try again."
+          : err?.message || "An unexpected error occurred"
+      );
     } finally {
       setIsLoading(false);
     }

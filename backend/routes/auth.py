@@ -3,44 +3,124 @@ Auth routes — register, login, update profile.
 Replaces: routes/authRoutes.js + controllers/authController.js
 """
 import os
+import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import bcrypt
 import jwt
 from bson import ObjectId
-from fastapi import APIRouter, Depends, Request
+from bson.errors import InvalidId
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, field_validator
 
-from auth_middleware import get_current_user
+from auth_middleware import get_current_user, _get_jwt_secret
 from database import get_db
 from helpers import serialize_doc
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+# JWT lifetime — keep in one place so we don't drift between login & profile update.
+TOKEN_TTL_HOURS = 24
+
+
+# ---------- Pydantic models ----------
+class RegisterIn(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=8, max_length=256)
+
+    @field_validator("username")
+    @classmethod
+    def _strip_username(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Username cannot be empty.")
+        return v
+
+
+class LoginIn(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=1, max_length=256)
+
+
+class ProfileIn(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+
+    @field_validator("username")
+    @classmethod
+    def _strip_username(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Username cannot be empty.")
+        return v
+
+
+# ---------- Helpers ----------
+def _issue_token(user_id: str, username: str) -> str:
+    return jwt.encode(
+        {
+            "id": user_id,
+            "username": username,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_TTL_HOURS),
+        },
+        _get_jwt_secret(),
+        algorithm="HS256",
+    )
+
+
+async def _hash_password(password: str) -> bytes:
+    # bcrypt is CPU-bound — push it off the event loop.
+    return await asyncio.to_thread(
+        bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt(rounds=10)
+    )
+
+
+async def _verify_password(password: str, hashed: str) -> bool:
+    try:
+        return await asyncio.to_thread(
+            bcrypt.checkpw, password.encode("utf-8"), hashed.encode("utf-8")
+        )
+    except (ValueError, TypeError):
+        # Corrupt hash in DB shouldn't crash the request.
+        logger.warning("Stored password hash is malformed")
+        return False
 
 
 # ---------- POST /api/auth/register ----------
 @router.post("/register")
-def register(request_body: dict, request: Request):
+async def register(body: RegisterIn):
     db = get_db()
-    username = request_body.get("username", "")
-    password = request_body.get("password", "")
+    username = body.username
 
-    if not username or not password or len(password) < 8:
-        return {"message": "Username and password (min 8 chars) are required."}, 400
+    try:
+        existing = db.users.find_one({"username": username})
+    except Exception:
+        logger.exception("DB error during register lookup")
+        raise HTTPException(status_code=503, detail={"message": "Database unavailable, please try again."})
 
-    existing = db.users.find_one({"username": username})
     if existing:
-        return {"message": "Username already exists."}, 409
+        raise HTTPException(status_code=409, detail={"message": "Username already exists."})
 
-    salt = bcrypt.gensalt(rounds=10)
-    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    try:
+        hashed = await _hash_password(body.password)
+    except Exception:
+        logger.exception("Password hashing failed")
+        raise HTTPException(status_code=500, detail={"message": "Could not create account."})
 
     now = datetime.now(timezone.utc)
-    result = db.users.insert_one({
-        "username": username,
-        "password": hashed.decode("utf-8"),
-        "createdAt": now,
-        "updatedAt": now,
-    })
+    try:
+        result = db.users.insert_one({
+            "username": username,
+            "password": hashed.decode("utf-8"),
+            "createdAt": now,
+            "updatedAt": now,
+        })
+    except Exception:
+        logger.exception("DB error during register insert")
+        raise HTTPException(status_code=503, detail={"message": "Database unavailable, please try again."})
 
     return {
         "message": "User registered successfully. You can now login.",
@@ -50,30 +130,28 @@ def register(request_body: dict, request: Request):
 
 # ---------- POST /api/auth/login ----------
 @router.post("/login")
-def login(request_body: dict):
+async def login(body: LoginIn):
     db = get_db()
-    username = request_body.get("username", "")
-    password = request_body.get("password", "")
 
-    if not username or not password:
-        return {"message": "Username and password are required."}, 400
+    try:
+        user = db.users.find_one({"username": body.username})
+    except Exception:
+        logger.exception("DB error during login lookup")
+        raise HTTPException(status_code=503, detail={"message": "Database unavailable, please try again."})
 
-    user = db.users.find_one({"username": username})
-    if not user:
-        return {"message": "Invalid credentials."}, 401
+    if not user or "password" not in user:
+        raise HTTPException(status_code=401, detail={"message": "Invalid credentials."})
 
-    if not bcrypt.checkpw(password.encode("utf-8"), user["password"].encode("utf-8")):
-        return {"message": "Invalid credentials."}, 401
+    if not await _verify_password(body.password, user["password"]):
+        raise HTTPException(status_code=401, detail={"message": "Invalid credentials."})
 
-    token = jwt.encode(
-        {
-            "id": str(user["_id"]),
-            "username": user["username"],
-            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
-        },
-        os.getenv("JWT_SECRET"),
-        algorithm="HS256",
-    )
+    try:
+        token = _issue_token(str(user["_id"]), user["username"])
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Token issuance failed")
+        raise HTTPException(status_code=500, detail={"message": "Could not complete login."})
 
     return {
         "message": "Login successful.",
@@ -84,32 +162,44 @@ def login(request_body: dict):
 
 # ---------- PUT /api/auth/profile ----------
 @router.put("/profile")
-def update_username(request_body: dict, current_user: dict = Depends(get_current_user)):
+async def update_username(body: ProfileIn, current_user: dict = Depends(get_current_user)):
     db = get_db()
-    new_username = request_body.get("username", "").strip()
-    user_id = current_user["id"]
+    new_username = body.username
+    user_id = current_user.get("id")
 
-    if not new_username:
-        return {"message": "Username cannot be empty."}, 400
+    if not user_id:
+        raise HTTPException(status_code=401, detail={"message": "Invalid session."})
 
-    existing = db.users.find_one({"username": new_username})
+    try:
+        user_oid = ObjectId(user_id)
+    except (InvalidId, TypeError):
+        raise HTTPException(status_code=400, detail={"message": "Invalid user id."})
+
+    try:
+        existing = db.users.find_one({"username": new_username})
+    except Exception:
+        logger.exception("DB error during profile lookup")
+        raise HTTPException(status_code=503, detail={"message": "Database unavailable, please try again."})
+
     if existing and str(existing["_id"]) != user_id:
-        return {"message": "Username already taken."}, 409
+        raise HTTPException(status_code=409, detail={"message": "Username already taken."})
 
-    db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"username": new_username, "updatedAt": datetime.now(timezone.utc)}},
-    )
+    try:
+        db.users.update_one(
+            {"_id": user_oid},
+            {"$set": {"username": new_username, "updatedAt": datetime.now(timezone.utc)}},
+        )
+    except Exception:
+        logger.exception("DB error during profile update")
+        raise HTTPException(status_code=503, detail={"message": "Database unavailable, please try again."})
 
-    token = jwt.encode(
-        {
-            "id": user_id,
-            "username": new_username,
-            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
-        },
-        os.getenv("JWT_SECRET"),
-        algorithm="HS256",
-    )
+    try:
+        token = _issue_token(user_id, new_username)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Token re-issuance failed")
+        raise HTTPException(status_code=500, detail={"message": "Could not refresh session."})
 
     return {
         "message": "Username updated successfully.",

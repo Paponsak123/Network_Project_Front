@@ -35,17 +35,30 @@ export default function DevicePage() {
     const loadLatestDevices = () => {
         setIsLoading(true);
         Promise.all([
-            fetchWithAuth(`${getApiUrl()}/api/scan/latest`).then(res => res.json()),
+            fetchWithAuth(`${getApiUrl()}/api/scan/latest`)
+                .then(async (res) => {
+                    if (!res.ok) return {};
+                    try {
+                        return await res.json();
+                    } catch {
+                        return {};
+                    }
+                })
+                .catch(() => ({})),
             getActiveKicks(fetchWithAuth).catch(() => []),
         ])
             .then(([latestScan, activeKicks]) => {
-                setDevices(latestScan.devices || []);
-                setScanTime(latestScan.scanTime);
-                setKickedIPs(new Set(activeKicks.map((k: { ip: string }) => k.ip)));
+                const scan = latestScan ?? {};
+                setDevices(Array.isArray(scan.devices) ? scan.devices : []);
+                setScanTime(typeof scan.scanTime === "string" ? scan.scanTime : null);
+                const kicks = Array.isArray(activeKicks) ? activeKicks : [];
+                setKickedIPs(
+                    new Set(kicks.filter((k: any) => k?.ip).map((k: { ip: string }) => k.ip))
+                );
                 setIsLoading(false);
             })
             .catch((err) => {
-                if (err.message !== "Unauthorized") {
+                if (err?.message !== "Unauthorized") {
                     console.error("Load error:", err);
                     setIsLoading(false);
                 }
