@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MonitorSmartphone, Clock, User, LogOut, ChevronDown, Shield } from "lucide-react";
+import { Home, MonitorSmartphone, Clock, User, LogOut, ChevronDown, SendToBack } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 function getUsernameFromToken(): string {
@@ -68,6 +68,7 @@ export function Navbar() {
     { name: "Home", href: "/", icon: Home },
     { name: "Devices", href: "/device", icon: MonitorSmartphone },
     { name: "History", href: "/history", icon: Clock },
+    { name: "Docdrop", href: "/docdrop", icon: SendToBack },
   ];
 
   return (
