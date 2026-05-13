@@ -31,21 +31,19 @@ def exec_command(command_list, timeout=30):
 
 
 def get_local_subnet() -> str:
-    """Auto-detect the local IP and return the /24 subnet with fallback."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Doesn't actually connect, just finds the interface
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
         s.close()
-        
+
         if local_ip.startswith("127."):
-            return "192.168.1.0/24"
+            return "192.168.1.0/24"  # last resort fallback
+
+        prefix = ".".join(local_ip.split(".")[:3])
+        return f"{prefix}.0/24"  # ✅ Uses actual IP, works for hotspot too
     except OSError:
         return "192.168.1.0/24"
-
-    prefix = ".".join(local_ip.split(".")[:3])
-    return f"{prefix}.0/24"
 
 
 def is_valid_device(ip, mac):

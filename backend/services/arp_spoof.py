@@ -11,6 +11,11 @@ Three background threads per kick:
   3. _track_ip_loop  — follows target if iOS reconnects and gets a new IP
   4. _liveness_loop  — pings target to report whether kick is effective
 
+Hotspot fallback (macOS only):
+  When your Mac IS the gateway (hotspot/Internet Sharing), ARP spoofing is
+  impossible. start_kick() automatically falls back to pf firewall rules to
+  block the target instead. stop_kick() cleans up the pf rule.
+
 NOTE: Requires root / CAP_NET_RAW. Only use on networks you own/administer.
 """
 
@@ -45,6 +50,7 @@ _MAC_RE = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 # State
 # ---------------------------------------------------------------------------
 _kicks: dict[str, "_Kick"] = {}
+_pf_kicks: dict[str, str] = {}   # ip → pf anchor name (hotspot fallback)
 _lock  = threading.Lock()
 
 
@@ -218,6 +224,34 @@ def _ping(ip: str, timeout: float = 1.0) -> bool:
 
 
 def _resolve_mac(ip: str, iface: str, timeout: float = 2.0, retries: int = 3) -> Optional[str]:
+    # 1. Check system ARP cache first — works even when raw ARP probes are blocked
+    try:
+        cmd = ["arp", "-n", ip] if platform.system() == "Linux" else ["arp", ip]
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=2).stdout
+        m = re.search(r"([0-9a-fA-F]{1,2}(?::[0-9a-fA-F]{1,2}){5})", out)
+        if m:
+            mac = normalize_mac(m.group(1))
+            if mac and mac != "ff:ff:ff:ff:ff:ff":
+                logger.debug("ARP cache hit for %s: %s", ip, mac)
+                return mac
+    except Exception:
+        pass
+
+    # 2. Ping to populate ARP cache then retry
+    try:
+        _ping(ip, timeout=1.0)
+        cmd = ["arp", "-n", ip] if platform.system() == "Linux" else ["arp", ip]
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=2).stdout
+        m = re.search(r"([0-9a-fA-F]{1,2}(?::[0-9a-fA-F]{1,2}){5})", out)
+        if m:
+            mac = normalize_mac(m.group(1))
+            if mac and mac != "ff:ff:ff:ff:ff:ff":
+                logger.debug("ARP cache hit after ping for %s: %s", ip, mac)
+                return mac
+    except Exception:
+        pass
+
+    # 3. Fall back to scapy srp()
     for _ in range(retries):
         try:
             ans, _ = srp(Ether(dst=_BROADCAST) / ARP(pdst=ip),
@@ -227,14 +261,7 @@ def _resolve_mac(ip: str, iface: str, timeout: float = 2.0, retries: int = 3) ->
         except Exception:
             pass
         time.sleep(0.3)
-    try:
-        cmd = ["arp", "-n", ip] if platform.system() == "Linux" else ["arp", ip]
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=2).stdout
-        m = re.search(r"([0-9a-fA-F]{1,2}(?::[0-9a-fA-F]{1,2}){5})", out)
-        if m:
-            return normalize_mac(m.group(1))
-    except Exception:
-        pass
+
     return None
 
 
@@ -253,6 +280,93 @@ def _set_ip_forwarding(enable: bool) -> None:
                            capture_output=True, timeout=3)
     except Exception as e:
         logger.warning("ip_forward toggle failed: %s", e)
+
+
+def _get_gateway_for(ip: str, iface: str) -> Optional[str]:
+    conf.route.resync()
+    try:
+        routed_iface, our_ip, gw_ip = conf.route.route(ip)
+
+        # Direct subnet route — scapy returns 0.0.0.0, use default gateway instead
+        if gw_ip == "0.0.0.0":
+            _, our_ip, gw_ip = conf.route.route("0.0.0.0")
+
+        # If still no gateway or gateway is our own IP, we ARE the gateway
+        if not gw_ip or gw_ip == "0.0.0.0" or gw_ip == our_ip:
+            return None
+
+        # Sanity: gateway must be on the same interface
+        if routed_iface != iface:
+            return None
+
+        return gw_ip
+    except Exception:
+        return None
+
+# ---------------------------------------------------------------------------
+# pf firewall fallback (macOS hotspot mode)
+# ---------------------------------------------------------------------------
+def _pf_anchor_name(ip: str) -> str:
+    return f"com.kickservice.block.{ip.replace('.', '_')}"
+
+
+def _pf_block(ip: str) -> bool:
+    """
+    Add a pf anchor that drops all traffic from `ip`.
+    Returns True on success, False on failure.
+    Requires sudo without password (NOPASSWD in sudoers) or running as root.
+    """
+    if platform.system() != "Darwin":
+        logger.warning("pf fallback only supported on macOS")
+        return False
+
+    anchor = _pf_anchor_name(ip)
+    rule = f"block drop from {ip} to any\n"
+
+    try:
+        # Write the rule into the anchor via stdin
+        load = subprocess.run(
+            ["sudo", "-n", "pfctl", "-a", anchor, "-f", "-"],
+            input=rule, text=True, capture_output=True, timeout=5,
+        )
+        if load.returncode != 0:
+            logger.error("pfctl load failed: %s", load.stderr.strip())
+            return False
+
+        # Make sure pf is enabled
+        subprocess.run(
+            ["sudo", "-n", "pfctl", "-e"],
+            capture_output=True, timeout=5,
+        )
+
+        logger.info("pf block active for %s (anchor: %s)", ip, anchor)
+        return True
+    except Exception as e:
+        logger.error("pf_block error for %s: %s", ip, e)
+        return False
+
+
+def _pf_unblock(ip: str) -> bool:
+    """Remove the pf anchor for `ip`, restoring its connectivity."""
+    if platform.system() != "Darwin":
+        return False
+
+    anchor = _pf_anchor_name(ip)
+    try:
+        # Flush the anchor rules (empty ruleset = no block)
+        flush = subprocess.run(
+            ["sudo", "-n", "pfctl", "-a", anchor, "-F", "rules"],
+            capture_output=True, timeout=5,
+        )
+        if flush.returncode != 0:
+            logger.warning("pfctl flush failed: %s", flush.stderr.strip())
+            return False
+
+        logger.info("pf block removed for %s", ip)
+        return True
+    except Exception as e:
+        logger.error("pf_unblock error for %s: %s", ip, e)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -320,9 +434,29 @@ def start_kick(target_ip: str, target_mac: str, mode: str = "kick") -> dict:
     if local_mac == tmac:
         raise ValueError("Target MAC is our own MAC.")
 
-    _, _, gw_ip = conf.route.route("0.0.0.0")
-    if not gw_ip or gw_ip == "0.0.0.0":
-        raise ValueError("No default gateway found.")
+    gw_ip = _get_gateway_for(ip, iface)
+    if not gw_ip:
+        # Hotspot mode — Mac is the gateway, ARP spoofing won't work.
+        # Fall back to pf firewall block instead.
+        logger.info("Hotspot detected on %s — using pf fallback for %s", iface, ip)
+        success = _pf_block(ip)
+        if not success:
+            raise ValueError(
+                f"Cannot kick {ip}: your Mac is the gateway on {iface} (hotspot mode) "
+                f"and pf firewall block also failed. Make sure the backend runs as root."
+            )
+        with _lock:
+            _pf_kicks[ip] = _pf_anchor_name(ip)
+        return {
+            "ip": ip,
+            "mac": tmac,
+            "mode": "pf_block",
+            "iface": iface,
+            "gateway": "self",
+            "effective": True,
+            "uptime_sec": 0,
+            "message": f"Hotspot mode: {ip} blocked via pf firewall.",
+        }
 
     gw_mac = _resolve_mac(gw_ip, iface)
     if not gw_mac:
@@ -348,6 +482,14 @@ def stop_kick(target_ip: str) -> dict:
     ip = validate_ip(target_ip)
     if not ip:
         raise ValueError(f"Invalid IP: {target_ip!r}")
+
+    # Check pf fallback first
+    with _lock:
+        pf_anchor = _pf_kicks.pop(ip, None)
+    if pf_anchor:
+        success = _pf_unblock(ip)
+        return {"ip": ip, "stopped": success, "mode": "pf_block"}
+
     with _lock:
         k = _kicks.pop(ip, None)
     if not k:
@@ -360,11 +502,15 @@ def stop_all_kicks() -> int:
     with _lock:
         items = list(_kicks.values())
         _kicks.clear()
+        pf_ips = list(_pf_kicks.keys())
+        _pf_kicks.clear()
     for k in items:
         k.stop.set()
     for k in items:
         k.join(timeout=1.5)
-    return len(items)
+    for ip in pf_ips:
+        _pf_unblock(ip)
+    return len(items) + len(pf_ips)
 
 
 def get_active_kicks() -> list[dict]:
@@ -372,7 +518,19 @@ def get_active_kicks() -> list[dict]:
         dead = [ip for ip, k in _kicks.items() if not k._threads or not k._threads[0].is_alive()]
         for ip in dead:
             _kicks.pop(ip)
-        return [_status(k) for k in _kicks.values()]
+        arp_list = [_status(k) for k in _kicks.values()]
+        pf_list = [
+            {
+                "ip": ip,
+                "mode": "pf_block",
+                "iface": "hotspot",
+                "gateway": "self",
+                "effective": True,
+                "uptime_sec": 0,
+            }
+            for ip in _pf_kicks
+        ]
+    return arp_list + pf_list
 
 
 def _status(k: _Kick, warning: Optional[str] = None, message: Optional[str] = None) -> dict:
