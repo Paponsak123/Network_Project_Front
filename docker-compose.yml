@@ -39,13 +39,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # BACKEND_URL is read from the shell environment at build time.
-        # Run ./start.sh instead of docker compose directly — it auto-detects
-        # your Mac's IP and exports it before building.
-        - BACKEND_URL=${BACKEND_URL:-http://localhost:8000}
+      # ดึงค่ามาจาก Shell Environment ที่ start.sh สร้างไว้
+      - BACKEND_URL=${BACKEND_URL}
     container_name: network_scanner_frontend
     ports:
-      - "3000:3000"
+    - "3000:3000"
     restart: unless-stopped
 
 volumes:

@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  /* ลบหรือคอมเมนต์ส่วน rewrites ออก เพื่อให้เราคุม URL ได้จากฝั่ง Client */
+  /*
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${process.env.BACKEND_URL || "http://localhost:8000"}/api/:path*`,
-      },
-    ];
+    return [ ... ];
   },
+  */
 };
 
 export default nextConfig;

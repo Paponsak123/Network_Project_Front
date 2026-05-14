@@ -3,7 +3,17 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MonitorSmartphone, Clock, User, LogOut, ChevronDown, SendToBack } from "lucide-react";
+import {
+  Home,
+  MonitorSmartphone,
+  Clock,
+  User,
+  LogOut,
+  ChevronDown,
+  SendToBack,
+  Menu,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 function getUsernameFromToken(): string {
@@ -20,7 +30,6 @@ function getUsernameFromToken(): string {
     const parts = token.split(".");
     if (parts.length < 2) return "";
 
-    // JWT payload is base64url; convert to standard base64 and pad before atob.
     let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     while (b64.length % 4) b64 += "=";
 
@@ -40,7 +49,9 @@ export function Navbar() {
   const { handleUnauthorized } = useAuth();
   const [username, setUsername] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let displayName = "";
@@ -51,18 +62,28 @@ export function Navbar() {
     }
     setUsername(displayName || getUsernameFromToken());
 
-    // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
+      }
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   const navItems = [
     { name: "Home", href: "/", icon: Home },
@@ -72,44 +93,49 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="fixed top-0 z-50 w-full backdrop-blur-md bg-white/70 dark:bg-black/70 border-b border-zinc-200/50 dark:border-zinc-800/50 shadow-sm transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo / Brand */}
-          <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="flex items-center gap-2 group">
+    <>
+      {/* ── TOP HEADER ── */}
+      <nav className="fixed top-0 z-50 w-full backdrop-blur-md bg-white/70 dark:bg-black/70 border-b border-zinc-200/50 dark:border-zinc-800/50 shadow-sm transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
               <img
-              src="/shrimp.png"
-              alt="ScanDer logo"
-              className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-all duration-300"
-/>
+                src="/shrimp.png"
+                alt="ScanDer logo"
+                className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-all duration-300"
+              />
               <div className="flex flex-col leading-none">
                 <span className="font-black text-xl tracking-tighter text-zinc-900 dark:text-white">
                   ScanDer<span className="text-indigo-600">.</span>
                 </span>
               </div>
             </Link>
-          </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center space-x-1">
+            {/* ── DESKTOP NAV LINKS ── */}
+            <div className="hidden md:flex items-center space-x-1">
               {navItems.map((item) => {
-                const isActive = pathname === item.href || (pathname?.startsWith(item.href) && item.href !== "/");
+                const isActive =
+                  pathname === item.href ||
+                  (pathname?.startsWith(item.href) && item.href !== "/");
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
                     className={`
                       relative px-4 py-2 rounded-xl text-[13px] font-bold transition-all duration-300 flex items-center gap-2 group
-                      ${isActive
-                        ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-500/10"
-                        : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
+                      ${
+                        isActive
+                          ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-500/10"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
                       }
                     `}
                   >
                     <item.icon
-                      className={`w-4 h-4 transition-transform duration-300 group-hover:scale-110 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`}
+                      className={`w-4 h-4 transition-transform duration-300 group-hover:scale-110 ${
+                        isActive ? "stroke-[2.5px]" : "stroke-2"
+                      }`}
                     />
                     <span>{item.name}</span>
                     {isActive && (
@@ -120,8 +146,8 @@ export function Navbar() {
               })}
             </div>
 
-            {/* Profile Dropdown */}
-            <div className="relative" ref={dropdownRef}>
+            {/* ── DESKTOP PROFILE DROPDOWN ── */}
+            <div className="hidden md:block relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:bg-zinc-200 dark:hover:bg-zinc-800 active:scale-95"
@@ -132,19 +158,29 @@ export function Navbar() {
                 <span className="text-xs font-black text-zinc-900 dark:text-white truncate max-w-[100px]">
                   {username || "User"}
                 </span>
-                <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform duration-300 ${isDropdownOpen ? "rotate-180" : ""}`} />
+                <ChevronDown
+                  className={`w-3 h-3 text-zinc-400 transition-transform duration-300 ${
+                    isDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
               </button>
 
-              {/* Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 z-[60]">
                   <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
-                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Identity</p>
-                    <p className="text-sm font-black text-zinc-900 dark:text-white truncate">{username}</p>
+                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">
+                      Identity
+                    </p>
+                    <p className="text-sm font-black text-zinc-900 dark:text-white truncate">
+                      {username || "User"}
+                    </p>
                   </div>
                   <div className="p-2">
                     <button
-                      onClick={handleUnauthorized}
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        handleUnauthorized();
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-rose-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
                     >
                       <LogOut className="w-4 h-4" /> Logout Session
@@ -153,61 +189,101 @@ export function Navbar() {
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Mobile Profile Trigger (Top Right) */}
-          <div className="md:hidden flex items-center gap-3">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center border border-zinc-200 dark:border-zinc-800"
-            >
-              <User className="w-5 h-5 text-zinc-500" />
-            </button>
-            {isDropdownOpen && (
-              <div className="fixed top-16 right-4 w-48 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl z-[60] animate-in fade-in slide-in-from-top-4">
-                <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
-                  <p className="text-sm font-black text-zinc-900 dark:text-white">{username}</p>
+            {/* ── MOBILE RIGHT: Profile avatar + Hamburger ── */}
+            <div className="md:hidden flex items-center gap-2">
+              {/* Avatar / profile indicator */}
+              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[11px] font-black uppercase select-none">
+                {username?.charAt(0) || <User className="w-4 h-4" />}
+              </div>
+
+              {/* Hamburger toggle */}
+              <button
+                onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                aria-label="Toggle menu"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all active:scale-95"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
+                ) : (
+                  <Menu className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── MOBILE DROPDOWN MENU ── */}
+        <div
+          ref={mobileMenuRef}
+          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+            isMobileMenuOpen ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
+          }`}
+        >
+          <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-t border-zinc-100 dark:border-zinc-800 px-4 py-3 space-y-1">
+            {/* Nav links */}
+            {navItems.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (pathname?.startsWith(item.href) && item.href !== "/");
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`
+                    flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-200
+                    ${
+                      isActive
+                        ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                        : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white"
+                    }
+                  `}
+                >
+                  <item.icon
+                    className={`w-5 h-5 flex-shrink-0 ${
+                      isActive ? "stroke-[2.5px]" : "stroke-2"
+                    }`}
+                  />
+                  <span>{item.name}</span>
+                  {isActive && (
+                    <span className="ml-auto w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
+                  )}
+                </Link>
+              );
+            })}
+
+            {/* Divider */}
+            <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
+
+            {/* User info + logout */}
+            <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[11px] font-black uppercase flex-shrink-0">
+                  {username?.charAt(0) || <User className="w-4 h-4" />}
                 </div>
-                <div className="p-2">
-                  <button
-                    onClick={handleUnauthorized}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-rose-500"
-                  >
-                    <LogOut className="w-4 h-4" /> Logout
-                  </button>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                    Signed in as
+                  </p>
+                  <p className="text-sm font-black text-zinc-900 dark:text-white truncate">
+                    {username || "User"}
+                  </p>
                 </div>
               </div>
-            )}
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleUnauthorized();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-rose-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex-shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Mobile Bottom Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-lg border-t border-zinc-200/50 dark:border-zinc-800/50 pb-safe">
-        <div className="flex justify-around items-center h-16 px-2">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || (pathname?.startsWith(item.href) && item.href !== "/");
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`
-                  flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-300 relative
-                  ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-500 dark:text-zinc-400"}
-                `}
-              >
-                <div className={`relative p-2 rounded-2xl transition-all duration-300 ${isActive ? "bg-indigo-100 dark:bg-indigo-900/40 scale-110 shadow-lg shadow-indigo-500/10" : ""}`}>
-                  <item.icon className={`w-5 h-5 ${isActive ? "stroke-[2.5px]" : "stroke-2"}`} />
-                </div>
-                <span className="text-[9px] font-black uppercase tracking-widest">{item.name}</span>
-                {isActive && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[3px] bg-indigo-600 dark:bg-indigo-500 rounded-b-full shadow-[0_2px_8px_rgba(79,70,229,0.4)]" />
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 }

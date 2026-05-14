@@ -1,12 +1,4 @@
-/**
- * Resilient fetch wrapper:
- *   - per-request timeout via AbortController (default 15s)
- *   - automatic retry on network failure + 5xx (default 2 retries)
- *   - exponential backoff with jitter
- *   - never retries on POST/PUT/PATCH/DELETE by default (avoid duplicate writes)
- *
- * Intentionally tiny so it can wrap any existing fetch call site.
- */
+import { getApiUrl } from "./config";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
@@ -14,20 +6,13 @@ const DEFAULT_RETRIES = 2;
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export interface FetchClientOptions extends RequestInit {
-  /** Per-request timeout in ms. Default: 15000. */
   timeoutMs?: number;
-  /** Max retry attempts after the first try. Default: 2 for safe methods, 0 for unsafe. */
   retries?: number;
-  /** Force retry even for unsafe methods (only use for idempotent endpoints). */
   forceRetry?: boolean;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/**
- * Cross-browser check for "request was aborted" — different runtimes use
- * different error names / messages, and DOMException isn't available in SSR.
- */
 export function isAbortError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const e = err as { name?: string; code?: string; message?: string };
@@ -41,6 +26,13 @@ export async function fetchClient(
   url: string,
   options: FetchClientOptions = {}
 ): Promise<Response> {
+  // --- 1. จัดการเรื่อง Base URL สำหรับมือถือ ---
+  let finalUrl = url;
+  if (url.startsWith("/")) {
+    const baseUrl = getApiUrl();
+    finalUrl = `${baseUrl}${url}`;
+  }
+
   const {
     timeoutMs = DEFAULT_TIMEOUT_MS,
     retries,
@@ -60,7 +52,6 @@ export async function fetchClient(
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
-    // Combine external signal with our timeout signal.
     const onExternalAbort = () => ctrl.abort();
     if (externalSignal) {
       if (externalSignal.aborted) ctrl.abort();
@@ -68,9 +59,9 @@ export async function fetchClient(
     }
 
     try {
-      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      // --- 2. ใช้ finalUrl ในการ fetch ---
+      const res = await fetch(finalUrl, { ...init, signal: ctrl.signal });
 
-      // Retry on server-side errors (likely transient).
       if (res.status >= 500 && res.status < 600 && attempt < maxRetries) {
         lastErr = new Error(`Server responded ${res.status}`);
       } else {
@@ -78,7 +69,6 @@ export async function fetchClient(
       }
     } catch (err) {
       lastErr = err;
-      // If caller aborted, surface immediately.
       if (externalSignal?.aborted) throw err;
     } finally {
       clearTimeout(timer);
@@ -86,12 +76,10 @@ export async function fetchClient(
     }
 
     if (attempt < maxRetries) {
-      // Exponential backoff with jitter: 300ms, 600ms, 1200ms ...
       const backoff = 300 * 2 ** attempt + Math.random() * 200;
       await sleep(backoff);
     }
   }
 
-  // Out of retries — rethrow the last error.
   throw lastErr instanceof Error ? lastErr : new Error("Network request failed");
 }

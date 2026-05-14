@@ -1,5 +1,8 @@
 import type { FetchClientOptions } from "@/utils/fetchClient";
 
+// 1. ดึง Base URL จากที่ start.sh ฝังไว้ให้
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 // Active OS fingerprinting does a TCP/IP probe — the UI hints ~10s, give it headroom.
 const FINGERPRINT_TIMEOUT_MS = 30_000;
 
@@ -17,7 +20,8 @@ async function safeJson(res: Response): Promise<any> {
  * ดึงรายการอุปกรณ์ทั้งหมด
  */
 export async function fetchDevices(fetchWithAuth: Fetcher) {
-  const res = await fetchWithAuth(`/api/devices`);
+  // ✅ แก้จาก /api/devices เป็น Full URL
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/devices`);
   if (!res.ok) return [];
   const data = await safeJson(res);
 
@@ -37,7 +41,8 @@ export async function fingerprintDevice(
   if (!deviceId) throw new Error("Missing device id");
 
   const qs = options.refresh ? "?refresh=1" : "";
-  const res = await fetchWithAuth(`/api/devices/${deviceId}/fingerprint${qs}`, {
+  // ✅ แก้เป็น Full URL
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/devices/${deviceId}/fingerprint${qs}`, {
     method: "POST",
     timeoutMs: FINGERPRINT_TIMEOUT_MS,
     retries: 0,
@@ -55,7 +60,8 @@ export async function fingerprintDevice(
  */
 export async function fetchDeviceSignals(fetchWithAuth: Fetcher, deviceId: string) {
   if (!deviceId) throw new Error("Missing device id");
-  const res = await fetchWithAuth(`/api/devices/${deviceId}/signals`);
+  // ✅ แก้เป็น Full URL
+  const res = await fetchWithAuth(`${API_BASE_URL}/api/devices/${deviceId}/signals`);
   const data = await safeJson(res);
   if (!res.ok) {
     const msg = data?.detail?.message || data?.message || "Failed to fetch signals";
@@ -64,9 +70,7 @@ export async function fetchDeviceSignals(fetchWithAuth: Fetcher, deviceId: strin
   return data ?? {};
 }
 
-// ---------------------------------------------------------------------------
-// Fingerprint result types (mirror of backend FingerprintResult)
-// ---------------------------------------------------------------------------
+// ... (ส่วน Interface ไม่ต้องแก้)
 export interface FingerprintIndicator {
   source: string;
   attribute: string;

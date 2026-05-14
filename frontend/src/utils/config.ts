@@ -1,10 +1,13 @@
 /**
- * Returns the base prefix for all API calls.
- *
- * All requests go through the Next.js rewrite rule:
- *   /api/:path*  →  http://backend:8000/api/:path*   (server-side, Docker network)
- *
- * Using an empty string means callers write `/api/...` as a relative URL,
- * which works in both the browser and during SSR (Next.js resolves it internally).
+ * คืนค่า URL พื้นฐานสำหรับเรียก API
  */
-export const getApiUrl = (): string => "";
+export const getApiUrl = (): string => {
+  // ดึงค่าจาก Environment Variable ที่เราฝังไว้ผ่าน start.sh
+  // สำคัญ: ต้องเป็น NEXT_PUBLIC_ เพื่อให้ฝั่ง Browser (มือถือ) มองเห็นค่านี้
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // กรณีรัน Development ปกติในคอมพิวเตอร์ (ใช้ empty string เพื่อให้ rewrite ทำงาน)
+  return ""; 
+};

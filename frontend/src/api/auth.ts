@@ -1,5 +1,8 @@
 import { fetchClient } from "@/utils/fetchClient";
 
+// 1. ดึง Base URL ที่เราฝัง IP ไว้ (ถ้าไม่มีให้ Default เป็น localhost)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 async function safeJson(res: Response): Promise<any> {
   try {
     return await res.json();
@@ -14,7 +17,8 @@ async function safeJson(res: Response): Promise<any> {
 export async function updateProfile(token: string, username: string) {
   if (!token) throw new Error("Missing auth token");
 
-  const res = await fetchClient(`/api/auth/profile`, {
+  // 2. เปลี่ยนจาก `/api/...` เป็น `${API_BASE_URL}/api/...`
+  const res = await fetchClient(`${API_BASE_URL}/api/auth/profile`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -23,6 +27,7 @@ export async function updateProfile(token: string, username: string) {
     },
     body: JSON.stringify({ username }),
   });
+
   const data = await safeJson(res);
   if (!res.ok) {
     const msg = data?.detail?.message || data?.message || "Update failed";

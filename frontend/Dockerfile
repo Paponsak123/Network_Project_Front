@@ -11,8 +11,8 @@ WORKDIR /app
 
 # Accept the backend URL at build time so next.config.mjs can bake it
 # into the routes manifest during `next build`.
-ARG BACKEND_URL=http://host.docker.internal:8000
-ENV BACKEND_URL=${BACKEND_URL}
+ARG BACKEND_URL
+ENV NEXT_PUBLIC_API_URL=${BACKEND_URL}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

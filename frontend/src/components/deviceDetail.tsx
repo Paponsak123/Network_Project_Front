@@ -1,5 +1,6 @@
 "use client";
-
+// แทนที่บรรทัดเดิมด้วยบรรทัดนี้ (ถอยหลังไป 1-2 step ให้ถึงโฟลเดอร์ hooks)
+import { useAuth } from "../hooks/useAuth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     X,
@@ -16,13 +17,14 @@ import {
     Server,
 } from "lucide-react";
 import { kickDevice, stopKick, getActiveKicks } from "@/api/kick";
-import {
-    fingerprintDevice,
-    fetchDeviceSignals,
-    type FingerprintResult,
-    type FingerprintIndicator,
+
+// ในไฟล์ src/components/deviceDetail.tsx
+import { 
+    fingerprintDevice, 
+    fetchDeviceSignals, 
+    type FingerprintResult,    // ตรวจสอบว่ามีคำว่า type และชื่อสะกดถูกเป๊ะๆ
+    type FingerprintIndicator 
 } from "@/api/devices";
-import { useAuth } from "@/hooks/useAuth";
 
 interface KickStatus {
     ip: string;
