@@ -95,7 +95,7 @@ export default function Home() {
   const offlineDevices = totalDevices - onlineDevices;
 
   return (
-    <div className="p-6 md:p-10">
+    <div className="p-6 md:p-10 pt-24 md:pt-28">
       <div className="max-w-6xl mx-auto space-y-12">
 
         {/* ===== Header ===== */}

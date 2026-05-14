@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 load_dotenv()
 
 from database import connect, close
-from routes import auth, scan, devices, kick, monitor
+from routes import auth, scan, devices, kick, monitor, transfer
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,6 +56,15 @@ async def lifespan(app: FastAPI):
     # Sniffer (only the worker that wins the Redis lock will actually start).
     start_fingerprinting()
 
+    # Start mDNS advertisement so other ScanDer instances can discover us.
+    try:
+        from services.mdns_advertiser import start_advertising
+        port = int(os.getenv("PORT", "8000"))
+        instance = os.getenv("MDNS_INSTANCE_NAME") or os.uname().nodename or "scander"
+        start_advertising(instance_name=instance, port=port)
+    except Exception:
+        log.exception("mDNS advertisement failed (non-fatal)")
+
     # Background flush: every 60s persist freshly-seen signals to MongoDB so
     # restarts (and Redis flushes) don't lose long-term context.
     flush_stop = threading.Event()
@@ -95,6 +104,12 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         flush_stop.set()
+        # Tear down mDNS advertisement so we don't leave stale records on LAN.
+        try:
+            from services.mdns_advertiser import stop_advertising
+            stop_advertising()
+        except Exception:
+            log.exception("mDNS stop failed (non-fatal)")
         # Always restore ARP state before going away — otherwise targets are
         # left disconnected after a server restart.
         try:
@@ -149,6 +164,7 @@ app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])
 app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
 app.include_router(kick.router, prefix="/api/kick", tags=["Kick"])
 app.include_router(monitor.router, prefix="/api/monitor", tags=["Monitor"])
+app.include_router(transfer.router, prefix="/api/transfer", tags=["Transfer"])
 
 
 

@@ -79,7 +79,7 @@ export default function DevicePage() {
     };
 
     return (
-        <div className="p-6 md:p-10">
+        <div className="p-6 md:p-10 pt-24 md:pt-28">
             <div className="max-w-5xl mx-auto space-y-12">
                 {/* Header */}
                 <div className="flex flex-col items-center space-y-3 animate-in fade-in slide-in-from-top-4 duration-1000">

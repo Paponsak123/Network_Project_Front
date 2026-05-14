@@ -9,3 +9,4 @@ certifi>=2023.0.0
 scapy>=2.5.0
 slowapi>=0.1.8
 redis>=5.0.0
+zeroconf>=0.131.0
