@@ -19,10 +19,6 @@ Design notes:
     starting; if a worker crashes the lock TTL expires (60 s) and another
     worker picks up.
 
-Backwards compatibility:
-  - The legacy `_update_device_info` helper that writes flat fields to the
-    `devices` collection is preserved so previously-deployed code paths keep
-    working. New code should consume signals via the cache module.
 """
 
 from __future__ import annotations
@@ -37,7 +33,6 @@ from typing import Any, Optional
 
 from scapy.all import DHCP, DNS, DNSQR, DNSRR, IP, UDP, Raw, conf, sniff  # type: ignore
 
-from database import get_db
 from services.cache import get_cache
 
 logger = logging.getLogger(__name__)
@@ -138,18 +133,6 @@ def _normalise_mac(mac: str) -> Optional[str]:
     if _MAC_RE.match(cleaned):
         return cleaned
     return None
-
-
-# ---------------------------------------------------------------------------
-# Legacy DB writer (kept for backwards compat — engine no longer uses this)
-# ---------------------------------------------------------------------------
-def _update_device_info(mac: str, info: dict) -> None:
-    try:
-        db = get_db()
-        if db is not None:
-            db.devices.update_one({"mac": mac.lower()}, {"$set": info}, upsert=False)
-    except Exception as e:
-        logger.debug("legacy _update_device_info failed for %s: %s", mac, e)
 
 
 # ---------------------------------------------------------------------------

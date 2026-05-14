@@ -65,26 +65,11 @@ def discover_devices():
 
     import platform
 
-    # ===== DEBUG: ดูจำนวน ARP entries ก่อน flush =====
-    arp_before = exec_command(["arp", "-a"])
-    before_count = len([line for line in arp_before.splitlines() if line.strip()])
-    print(f"[DEBUG] ARP entries before flush: {before_count}", flush=True)
-
-    # ===== Flush ARP / Neighbor cache =====
+    # Flush ARP / Neighbor cache
     if platform.system() == "Darwin":  # macOS
         exec_command(["sudo", "arp", "-da"])
     else:  # Linux
         exec_command(["sudo", "ip", "neigh", "flush", "all"])
-
-    # ===== DEBUG: ดูจำนวน ARP entries หลัง flush =====
-    arp_after = exec_command(["arp", "-a"])
-    after_count = len([line for line in arp_after.splitlines() if line.strip()])
-    print(f"[DEBUG] ARP entries after flush: {after_count}", flush=True)
-
-    if after_count < before_count:
-        print("[DEBUG] ARP cache flushed successfully.", flush=True)
-    else:
-        print("[DEBUG] Cache may have been immediately repopulated.", flush=True)
 
     # 1. ARP Cache
     arp_output = exec_command(["arp", "-a"])
@@ -124,29 +109,6 @@ def discover_devices():
             current_ip = None
 
     return [{"ip": ip, "mac": mac} for ip, mac in devices_by_ip.items()]
-
-
-def detect_os(ip):
-    """Use nmap -O to try and detect the operating system."""
-    try:
-        # ✅ Needs sudo for OS detection
-        output = exec_command([
-            "sudo", "nmap", "-O", "-Pn", "--osscan-limit", "--max-os-tries", "1", ip
-        ], timeout=60)
-        
-        match = re.search(r"OS details:\s+(.+)", output)
-        if match:
-            return match.group(1)
-        
-        if "Aggressive OS guesses" in output:
-            guess_match = re.search(r"Aggressive OS guesses:\s+([^,]+)", output)
-            if guess_match:
-                return guess_match.group(1)
-            
-        return "Unknown OS"
-    except Exception as e:
-        logger.warning("OS Detection error for %s: %s", ip, e)
-        return "Unknown OS"
 
 
 def scan_device(ip):

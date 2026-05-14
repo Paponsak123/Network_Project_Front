@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -18,14 +18,6 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 # ---------- Models ----------
-class DeviceSnapshot(BaseModel):
-    ip: str
-    mac: str
-    vendor: str
-    deviceType: str
-    status: str
-    ports: List[int]
-
 class ScanResponse(BaseModel):
     message: str
     scanId: str

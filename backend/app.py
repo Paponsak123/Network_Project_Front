@@ -10,8 +10,7 @@ from slowapi.errors import RateLimitExceeded
 
 load_dotenv()
 
-from database import connect, close
-from routes import auth, scan, devices, kick, monitor, transfer
+from routes import auth, scan, devices, kick, transfer
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,14 +21,12 @@ async def lifespan(app: FastAPI):
     import time
     from datetime import datetime, timezone
     from database import connect, close, get_db
-    from services.monitor import set_main_loop
     from services.fingerprint import start_fingerprinting
     from services.arp_spoof import stop_all_kicks
     from services.cache import get_cache
 
     log = logging.getLogger(__name__)
 
-    set_main_loop(asyncio.get_running_loop())
     connect()
 
     # Initialise the cache (loads Redis client or falls back to in-memory).
@@ -163,7 +160,6 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(scan.router, prefix="/api/scan", tags=["Scan"])
 app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
 app.include_router(kick.router, prefix="/api/kick", tags=["Kick"])
-app.include_router(monitor.router, prefix="/api/monitor", tags=["Monitor"])
 app.include_router(transfer.router, prefix="/api/transfer", tags=["Transfer"])
 
 

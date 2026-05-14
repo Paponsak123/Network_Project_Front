@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchScanHistory } from "@/api/scan";
-import { History as HistoryIcon, ChevronDown, ChevronUp, Calendar, Database, Loader2, Search } from "lucide-react";
+import { History as HistoryIcon, ChevronDown, ChevronUp, Calendar, Database, Loader2 } from "lucide-react";
 
 interface DeviceSnapshot {
     ip: string;
