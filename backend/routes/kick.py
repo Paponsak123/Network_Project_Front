@@ -25,7 +25,7 @@ from services.arp_spoof import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 # --- input models ----------------------------------------------------------
@@ -64,7 +64,7 @@ class StopKickRequest(BaseModel):
 
 
 # --- routes ----------------------------------------------------------------
-@router.post("/")
+@router.post("")
 def kick_device(body: KickRequest, current_user: dict = Depends(get_current_user)):
     """Start ARP spoofing to disconnect a device from the network."""
     try:

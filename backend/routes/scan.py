@@ -14,7 +14,7 @@ from database import get_db
 from helpers import serialize_doc
 from services.network import perform_full_scan
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 limiter = Limiter(key_func=get_remote_address)
 
 # ---------- Models ----------
@@ -25,7 +25,7 @@ class ScanResponse(BaseModel):
     devices: List[dict]
 
 # ---------- POST /api/scan ----------
-@router.post("/", response_model=ScanResponse)
+@router.post("", response_model=ScanResponse)
 @limiter.limit("8/minute")
 async def trigger_scan(
     request: Request,
@@ -52,44 +52,49 @@ async def trigger_scan(
 
     # Upsert each device (keyed by MAC + owner)
     saved_devices = []
-    for device in discovered:
-        doc = db.devices.find_one_and_update(
-            {"mac": device["mac"], "owner": ObjectId(user_id)},
-            {"$set": {
-                "ip": device["ip"],
-                "vendor": device["vendor"],
-                "deviceType": device["deviceType"],
-                "status": device["status"],
-                "ports": device["ports"],
-                "os": device.get("os"),  
-                "lastSeen": device["lastSeen"],
-                "updatedAt": now,
-            },
-            "$setOnInsert": {
-                "customName": "",
-                "createdAt": now,
-            }},
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
-        saved_devices.append(serialize_doc(doc))
+    try:
+        for device in discovered:
+            doc = db.devices.find_one_and_update(
+                {"mac": device["mac"], "owner": ObjectId(user_id)},
+                {"$set": {
+                    "ip": device["ip"],
+                    "vendor": device["vendor"],
+                    "deviceType": device["deviceType"],
+                    "status": device["status"],
+                    "ports": device["ports"],
+                    "os": device.get("os"),
+                    "lastSeen": device["lastSeen"],
+                    "updatedAt": now,
+                },
+                "$setOnInsert": {
+                    "customName": "",
+                    "createdAt": now,
+                }},
+                upsert=True,
+                return_document=ReturnDocument.AFTER,
+            )
+            saved_devices.append(serialize_doc(doc))
 
-    # Build snapshots for scan history
-    snapshots = [{
-        "ip": d["ip"], "mac": d["mac"], "vendor": d["vendor"],
-        "deviceType": d["deviceType"], "status": d["status"], "ports": d["ports"],
-    } for d in saved_devices]
+        # Build snapshots for scan history
+        snapshots = [{
+            "ip": d["ip"], "mac": d["mac"], "vendor": d["vendor"],
+            "deviceType": d["deviceType"], "status": d["status"], "ports": d["ports"],
+        } for d in saved_devices]
 
-    # Save scan record
-    scan_doc = {
-        "scannedBy": ObjectId(user_id),
-        "scanTime": now,
-        "totalDevices": len(snapshots),
-        "devices": snapshots,
-        "createdAt": now,
-        "updatedAt": now,
-    }
-    result = db.scans.insert_one(scan_doc)
+        # Save scan record
+        scan_doc = {
+            "scannedBy": ObjectId(user_id),
+            "scanTime": now,
+            "totalDevices": len(snapshots),
+            "devices": snapshots,
+            "createdAt": now,
+            "updatedAt": now,
+        }
+        result = db.scans.insert_one(scan_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save scan results: {str(e)}")
 
     return {
         "message": "Scan complete.",

@@ -147,10 +147,14 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS — allow all origins
+# Note: allow_origins=["*"] with allow_credentials=True is invalid per the
+# CORS spec and causes browsers to strip Authorization headers on cross-origin
+# requests. We disable credentials here since auth is handled via Bearer token
+# in the Authorization header (not cookies).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

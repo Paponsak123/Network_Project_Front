@@ -1,7 +1,4 @@
-import { getApiUrl } from "@/utils/config";
 import type { FetchClientOptions } from "@/utils/fetchClient";
-
-const API = getApiUrl();
 
 // Network scans can be slow (subnet sweep + port probe). Allow up to 2 minutes
 // before aborting — far longer than the 15s default.
@@ -23,7 +20,7 @@ async function safeJson(res: Response): Promise<any> {
  * เริ่มสแกนเครือข่าย
  */
 export async function triggerScan(fetchWithAuth: Fetcher) {
-  const res = await fetchWithAuth(`${API}/api/scan/`, {
+  const res = await fetchWithAuth(`/api/scan`, {
     method: "POST",
     timeoutMs: SCAN_TIMEOUT_MS,
     // Scans mutate state on the server (write a new history record). Don't auto-retry.
@@ -41,7 +38,7 @@ export async function triggerScan(fetchWithAuth: Fetcher) {
  * ดึงประวัติการสแกน
  */
 export async function fetchScanHistory(fetchWithAuth: Fetcher) {
-  const res = await fetchWithAuth(`${API}/api/scan/history`, {
+  const res = await fetchWithAuth(`/api/scan/history`, {
     timeoutMs: READ_TIMEOUT_MS,
   });
   if (!res.ok) return [];

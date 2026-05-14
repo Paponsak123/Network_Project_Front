@@ -1,6 +1,4 @@
-import { getApiUrl } from "@/utils/config";
 import { fetchClient } from "@/utils/fetchClient";
-const API = getApiUrl();
 
 async function safeJson(res: Response): Promise<any> {
   try {
@@ -16,7 +14,7 @@ async function safeJson(res: Response): Promise<any> {
 export async function updateProfile(token: string, username: string) {
   if (!token) throw new Error("Missing auth token");
 
-  const res = await fetchClient(`${API}/api/auth/profile`, {
+  const res = await fetchClient(`/api/auth/profile`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

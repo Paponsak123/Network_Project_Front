@@ -1,32 +1,53 @@
-version: '3.8'
+# docker-compose.yml
 
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: network_scanner_backend
-    # ใช้ network_mode: "host" เพื่อให้ backend เห็น Network วงเดียวกับเครื่อง Server ที่รัน
-    # เป็นการรับประกันว่าจะสามารถสแกน Router และเครื่องอื่นๆ ในบริษัทได้
-    # network_mode: "host" ใช้ไม่ได้ผลบนเครื่อง Mac (Docker for Mac สร้าง VM ขั้นกลางไว้)
-    # ทำให้เราต้องใช้วิธี Map Port ออกมาแทน เพื่อให้ Frontend สามารถเชื่อมต่อหา Backend ได้
+  redis:
+    image: redis:7-alpine
+    container_name: network_scanner_redis
     ports:
-      - "8000:8000"
-    privileged: true
-    env_file:
-      - ./backend/.env # ดึงตัวแปรสภาพแวดล้อม (เช่น MONGODB_URI) จากไฟล์ .env ของ backend
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+
+  mongo:
+    image: mongo:latest
+    container_name: network_scanner_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Backend runs natively on macOS (outside Docker) so it can access the real
+  # network interface for nmap scanning and Scapy packet sniffing.
+  # Start it manually — see instructions below.
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # BACKEND_URL is read from the shell environment at build time.
+        # Run ./start.sh instead of docker compose directly — it auto-detects
+        # your Mac's IP and exports it before building.
+        - BACKEND_URL=${BACKEND_URL:-http://localhost:8000}
     container_name: network_scanner_frontend
     ports:
-      - "3000:3000" # Map port 3000 ของ Container ออกมาที่ 3000 ของเครื่อง Host
-    environment:
-      # ตั้งค่าให้ Frontend ชี้ไปหา Backend ที่รันอยู่บน localhost:8000 (เนื่องจาก Backend ใช้โหมด host)
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      - backend
+      - "3000:3000"
     restart: unless-stopped
+
+volumes:
+  redis_data:
+  mongo_data:

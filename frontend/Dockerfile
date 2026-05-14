@@ -1,16 +1,34 @@
-FROM node:20-alpine
+# frontend/Dockerfile
+# ---- deps stage ----
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
 
+# ---- builder stage ----
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# คัดลอก package.json เพื่อติดตั้ง Dependencies
-COPY package.json package-lock.json* ./
-RUN npm install
+# Accept the backend URL at build time so next.config.mjs can bake it
+# into the routes manifest during `next build`.
+ARG BACKEND_URL=http://host.docker.internal:8000
+ENV BACKEND_URL=${BACKEND_URL}
 
-# คัดลอกโค้ดทั้งหมดและ Build Next.js
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
+# ---- runner stage ----
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
 EXPOSE 3000
 
-# สั่งรัน Next.js ในโหมด Production
 CMD ["npm", "run", "start"]
