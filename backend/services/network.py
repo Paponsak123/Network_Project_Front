@@ -8,7 +8,7 @@ import subprocess
 import logging
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from mac_vendor_lookup import MacLookup
+from mac_vendor_lookup import MacLookup, VendorNotFoundError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -149,11 +149,19 @@ def is_randomized_mac(mac):
 
 
 def get_vendor(mac):
-    """Look up MAC vendor using global instance."""
+    """Look up MAC vendor using global instance.
+
+    Returns vendor name string, or a descriptive fallback if the MAC
+    is randomized/private or simply not found in the local database.
+    """
     try:
         return _mac_lookup.lookup(mac)
-    except Exception:
+    except VendorNotFoundError:
+        # MAC prefix not in local OUI database — common for devices
+        # using Private/Randomized MAC (iOS, Android, Windows 11+)
         pass
+    except Exception as e:
+        logger.debug("MAC lookup error for %s: %s", mac, e)
 
     if is_randomized_mac(mac):
         return "Randomized MAC (Privacy)"
